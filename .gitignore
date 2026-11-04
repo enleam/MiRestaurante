@@ -1,0 +1,29 @@
+# ==================================
+# BACKEND - Node.js
+# ==================================
+
+BACKEND/node_modules/
+BACKEND/.env
+BACKEND/.env.*
+!BACKEND/.env.example
+BACKEND/npm-debug.log*
+
+# ==================================
+# ANDROID - Android Studio
+# ==================================
+
+ANDROID/.gradle/
+ANDROID/.kotlin/
+ANDROID/.idea/
+ANDROID/**/build/
+ANDROID/local.properties
+ANDROID/.externalNativeBuild/
+ANDROID/.cxx/
+ANDROID/*.iml
+
+# ==================================
+# Archivos privados
+# ==================================
+
+*.jks
+*.keystore
