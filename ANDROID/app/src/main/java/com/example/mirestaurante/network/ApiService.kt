@@ -28,4 +28,11 @@ interface ApiService {
         @Path("mesaId") mesaId:Int,
         @Header("Authorization") token: String
     ): Response<MesaResponse>
+
+    //HU04: iniciar la atencion de una mesa libre
+    @POST("api/mesas/{mesaId}/atenciones")
+    suspend fun iniciarAtencion(
+        @Path("mesaId") mesaId: Int,
+        @Header("Authorization") token: String
+    ): Response<IniciarAtencionResponse>
 }

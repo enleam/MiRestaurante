@@ -2,6 +2,7 @@ package com.example.mirestaurante.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,6 +24,7 @@ import com.example.mirestaurante.R
 import com.example.mirestaurante.network.Mesa
 import com.example.mirestaurante.network.RetrofitClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 //Colores del prototipo
@@ -49,6 +51,63 @@ fun PantallaMesas(token: String, onCerrarSesion: () -> Unit) {
     var cargando by remember { mutableStateOf(true) }
     var mensajeError by remember { mutableStateOf("") }
     var numeroActualizacion by remember { mutableStateOf(0) }
+
+    // HU04: mesa elegida para iniciar su atencion y estado de la solicitud
+    var mesaSeleccionada by remember { mutableStateOf<Mesa?>(null) }
+    var iniciandoAtencion by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // HU04: enviar al backend el inicio de la atencion de una mesa libre
+    fun iniciarAtencion(mesa: Mesa) {
+        iniciandoAtencion = true
+
+        scope.launch {
+            val mensaje = try {
+                val respuesta = RetrofitClient.api.iniciarAtencion(
+                    mesaId = mesa.mesaId,
+                    token = "Bearer $token"
+                )
+
+                if (respuesta.isSuccessful) {
+                    val datos = respuesta.body()
+
+                    // Mostrar la mesa como ocupada sin volver a consultar toda la lista
+                    val mesaActualizada = datos?.mesa ?: mesa.copy(estado = "OCUPADA")
+                    mesas = mesas.map {
+                        if (it.mesaId == mesaActualizada.mesaId) mesaActualizada else it
+                    }
+
+                    "Atención iniciada en la Mesa ${mesa.numero.toString().padStart(2, '0')}"
+                } else {
+                    when (respuesta.code()) {
+                        409 -> {
+                            // Otro mozo la ocupo antes: actualizar la lista
+                            numeroActualizacion++
+                            "La mesa ya no está disponible. Se actualizó la lista de mesas"
+                        }
+                        404 -> {
+                            numeroActualizacion++
+                            "La mesa no existe o ya no está activa"
+                        }
+                        401 -> "La sesión ha expirado. Inicia sesión nuevamente"
+                        403 -> "No tiene permisos para realizar esta operación"
+                        else -> "No se pudo iniciar la atención. Inténtelo nuevamente"
+                    }
+                }
+            } catch (error: IOException) {
+                "No se pudo establecer conexión con el servidor. Verifique su conexión e inténtelo nuevamente"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                "Ocurrió un error al iniciar la atención"
+            }
+
+            iniciandoAtencion = false
+            mesaSeleccionada = null
+            snackbarHostState.showSnackbar(mensaje)
+        }
+    }
 
     // Consultar al entrar en la pantalla y al presionar Actualizar
     LaunchedEffect(token, numeroActualizacion) {
@@ -96,6 +155,11 @@ fun PantallaMesas(token: String, onCerrarSesion: () -> Unit) {
     Scaffold(
         containerColor = Color.White,
 
+        //Mensajes de resultado de la HU04
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
+
         //Menu inferior
         bottomBar = {
             MenuInferiorMesas()
@@ -130,7 +194,7 @@ fun PantallaMesas(token: String, onCerrarSesion: () -> Unit) {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Consulta el estado de las mesas",
+                        text = "Toca una mesa libre para iniciar su atención",
                         fontSize = 14.sp,
                         color = GrisTexto
                     )
@@ -327,16 +391,80 @@ fun PantallaMesas(token: String, onCerrarSesion: () -> Unit) {
                     key = { it.mesaId }
                 ) { mesa ->
 
-                    TarjetaMesa(mesa)
+                    TarjetaMesa(
+                        mesa = mesa,
+                        habilitada = !iniciandoAtencion,
+                        onIniciarAtencion = { mesaSeleccionada = mesa }
+                    )
                 }
             }
         }
     }
+
+    // HU04: confirmar antes de iniciar la atencion
+    mesaSeleccionada?.let { mesa ->
+        val numeroMesa = mesa.numero.toString().padStart(2, '0')
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!iniciandoAtencion) mesaSeleccionada = null
+            },
+            title = {
+                Text(
+                    text = "Iniciar atención",
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            text = {
+                Text(
+                    text = "¿Deseas iniciar la atención de la Mesa $numeroMesa " +
+                        "(capacidad: ${mesa.capacidad} personas)? " +
+                        "La mesa pasará a estado Ocupada.",
+                    fontSize = 15.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { iniciarAtencion(mesa) },
+                    enabled = !iniciandoAtencion,
+                    colors = ButtonDefaults.buttonColors(containerColor = Naranja),
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    if (iniciandoAtencion) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Text("Iniciar", color = Color.White)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { mesaSeleccionada = null },
+                    enabled = !iniciandoAtencion,
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    Text("Cancelar", color = GrisTexto)
+                }
+            },
+            containerColor = Color.White
+        )
+    }
 }
 
 //Tarjeta individual de mesa
+//HU04: las mesas libres se pueden tocar para iniciar su atencion
 @Composable
-private fun TarjetaMesa(mesa: Mesa) {
+private fun TarjetaMesa(
+    mesa: Mesa,
+    habilitada: Boolean,
+    onIniciarAtencion: () -> Unit
+) {
+
+    val esLibre = mesa.estado == "LIBRE"
 
     val colorEstado = when (mesa.estado) {
         "LIBRE" -> Verde
@@ -355,10 +483,15 @@ private fun TarjetaMesa(mesa: Mesa) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(146.dp),
+            .height(146.dp)
+            .clickable(
+                enabled = esLibre && habilitada,
+                onClickLabel = "Iniciar atención",
+                onClick = onIniciarAtencion
+            ),
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, GrisBorde)
+        border = BorderStroke(1.dp, if (esLibre) Verde.copy(alpha = 0.5f) else GrisBorde)
     ) {
 
         Column(
@@ -414,6 +547,18 @@ private fun TarjetaMesa(mesa: Mesa) {
                 fontSize = 11.sp,
                 color = GrisTexto
             )
+
+            // Indicar la accion disponible en las mesas libres
+            if (esLibre) {
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Toca para iniciar atención",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Naranja
+                )
+            }
         }
     }
 }

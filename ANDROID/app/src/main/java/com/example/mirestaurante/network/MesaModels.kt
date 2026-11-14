@@ -19,3 +19,19 @@ data class MesaResponse(
     val mensaje: String,
     val mesa: Mesa
 )
+
+//HU04: atencion registrada al iniciar el servicio de una mesa
+data class Atencion(
+    val atencionId: Int,
+    val mesaId: Int,
+    val mozoId: Int,
+    val fechaApertura: String,
+    val estado: String
+)
+
+//HU04: respuesta al iniciar la atencion de una mesa
+data class IniciarAtencionResponse(
+    val mensaje: String,
+    val atencion: Atencion,
+    val mesa: Mesa
+)
