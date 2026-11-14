@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const { conectarBD } = require("./config/db");
 const authRoutes = require("./routes/auth.routes");
+const mesaRoutes = require("./routes/mesa.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,9 @@ app.get("/api/health", (req,res) => {
 
 //Rutas de autenticacion
 app.use("/api/auth", authRoutes);
+
+//Ruta de mesa
+app.use("/api/mesas", mesaRoutes);
 
 //Iniciar el servidor
 async function iniciarServidor() {

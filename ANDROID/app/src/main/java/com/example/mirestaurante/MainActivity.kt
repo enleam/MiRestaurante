@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
                     "MOZO" -> {
                         PantallaMesas(
+                            token = sesion?.token.orEmpty(),
                             onCerrarSesion = {
                                 sesion = null
                             }

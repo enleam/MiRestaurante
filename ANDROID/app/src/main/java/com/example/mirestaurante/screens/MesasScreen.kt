@@ -20,6 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mirestaurante.R
+import com.example.mirestaurante.network.Mesa
+import com.example.mirestaurante.network.RetrofitClient
+import kotlinx.coroutines.CancellationException
+import java.io.IOException
 
 //Colores del prototipo
 private val Naranja = Color(0xFFDB7C43)
@@ -28,44 +32,63 @@ private val Azul = Color(0xFF5D83A7)
 private val GrisBorde = Color(0xFFE3E3E3)
 private val GrisTexto = Color(0xFF777777)
 
-//Datos para mostrar las mesas
-private data class MesaDemo(
-    val numero: Int,
-    val estado: String
-)
-
 @Composable
-fun PantallaMesas(onCerrarSesion: () -> Unit) {
+fun PantallaMesas(token: String, onCerrarSesion: () -> Unit) {
 
     var filtro by rememberSaveable {
         mutableStateOf("Todas")
     }
 
-    //Controlar si el menu de usuario esta abierto
-        var menuUsuarioAbierto by remember {
-            mutableStateOf(false)
-        }
+    // Controlar el menu del usuario
+    var menuUsuarioAbierto by remember {
+        mutableStateOf(false)
+    }
 
-    //Mesas de ejemplo segun nuestro prototipo
-    val mesas = remember {
-        listOf(
-            MesaDemo(1, "Libre"),
-            MesaDemo(2, "Ocupada"),
-            MesaDemo(3, "Reservada"),
-            MesaDemo(4, "Ocupada"),
-            MesaDemo(5, "Libre"),
-            MesaDemo(6, "Reservada"),
-            MesaDemo(7, "Ocupada"),
-            MesaDemo(8, "Libre")
-        )
+    // Mesas obtenidas desde SQL Server a traves de la API
+    var mesas by remember { mutableStateOf<List<Mesa>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var mensajeError by remember { mutableStateOf("") }
+    var numeroActualizacion by remember { mutableStateOf(0) }
+
+    // Consultar al entrar en la pantalla y al presionar Actualizar
+    LaunchedEffect(token, numeroActualizacion) {
+        cargando = true
+        mensajeError = ""
+
+        try {
+            val respuesta = RetrofitClient.api.listarMesas("Bearer $token")
+
+            if (respuesta.isSuccessful) {
+                val datos = respuesta.body()
+                if (datos != null) {
+                    mesas = datos.mesas
+                } else {
+                    mensajeError = "El servidor no devolvio datos de mesas"
+                }
+            } else {
+                mensajeError = when (respuesta.code()) {
+                    401 -> "La sesion ha expirado. Inicia sesion nuevamente"
+                    403 -> "No tienes permiso para consultar las mesas"
+                    else -> "No se pudieron obtener las mesas (${respuesta.code()})"
+                }
+            }
+        } catch (error: IOException) {
+            mensajeError = "No se pudo conectar con el servidor"
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            mensajeError = "Ocurrio un error al cargar las mesas"
+        } finally {
+            cargando = false
+        }
     }
 
     //Aplicar el filtro seleccionado
     val mesasFiltradas = mesas.filter { mesa ->
         when (filtro) {
-            "Libres" -> mesa.estado == "Libre"
-            "Ocupadas" -> mesa.estado == "Ocupada"
-            "Reservadas" -> mesa.estado == "Reservada"
+            "Libres" -> mesa.estado == "LIBRE"
+            "Ocupadas" -> mesa.estado == "OCUPADA"
+            "Reservadas" -> mesa.estado == "RESERVADA"
             else -> true
         }
     }
@@ -149,7 +172,36 @@ fun PantallaMesas(onCerrarSesion: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Permite volver a consultar los estados de las mesas
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = { numeroActualizacion++ },
+                    enabled = !cargando
+                ) {
+                    Text("Actualizar", color = Naranja)
+                }
+            }
+
+            // Indicador de consulta y errores de conexion
+            if (cargando) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Naranja
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (mensajeError.isNotBlank()) {
+                Text(text = mensajeError, color = Color(0xFFB3261E))
+                TextButton(onClick = { numeroActualizacion++ }) {
+                    Text("Reintentar", color = Naranja)
+                }
+            }
 
             //Contadores de mesas
             Row(
@@ -160,17 +212,17 @@ fun PantallaMesas(onCerrarSesion: () -> Unit) {
                 val resumen = listOf(
                     Triple(
                         "Libres",
-                        mesas.count { it.estado == "Libre" },
+                        mesas.count { it.estado == "LIBRE" },
                         Verde
                     ),
                     Triple(
                         "Ocupadas",
-                        mesas.count { it.estado == "Ocupada" },
+                        mesas.count { it.estado == "OCUPADA" },
                         Naranja
                     ),
                     Triple(
                         "Reservadas",
-                        mesas.count { it.estado == "Reservada" },
+                        mesas.count { it.estado == "RESERVADA" },
                         Azul
                     )
                 )
@@ -252,6 +304,15 @@ fun PantallaMesas(onCerrarSesion: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Si la lista viene vacia, mostrar un mensaje
+            if (!cargando && mensajeError.isBlank() && mesasFiltradas.isEmpty()) {
+                Text(
+                    text = "No hay mesas para el filtro seleccionado",
+                    color = GrisTexto,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+
             //Cuadricula de mesas
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -263,7 +324,7 @@ fun PantallaMesas(onCerrarSesion: () -> Unit) {
 
                 items(
                     mesasFiltradas,
-                    key = { it.numero }
+                    key = { it.mesaId }
                 ) { mesa ->
 
                     TarjetaMesa(mesa)
@@ -275,18 +336,26 @@ fun PantallaMesas(onCerrarSesion: () -> Unit) {
 
 //Tarjeta individual de mesa
 @Composable
-private fun TarjetaMesa(mesa: MesaDemo) {
+private fun TarjetaMesa(mesa: Mesa) {
 
     val colorEstado = when (mesa.estado) {
-        "Libre" -> Verde
-        "Ocupada" -> Naranja
-        else -> Azul
+        "LIBRE" -> Verde
+        "OCUPADA" -> Naranja
+        "RESERVADA" -> Azul
+        else -> GrisTexto
+    }
+
+    val textoEstado = when (mesa.estado) {
+        "LIBRE" -> "Libre"
+        "OCUPADA" -> "Ocupada"
+        "RESERVADA" -> "Reservada"
+        else -> mesa.estado
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(125.dp),
+            .height(146.dp),
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
         border = BorderStroke(1.dp, GrisBorde)
@@ -331,12 +400,20 @@ private fun TarjetaMesa(mesa: MesaDemo) {
                 Spacer(modifier = Modifier.width(5.dp))
 
                 Text(
-                    text = mesa.estado,
+                    text = textoEstado,
                     color = colorEstado,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Capacidad: ${mesa.capacidad} personas",
+                fontSize = 11.sp,
+                color = GrisTexto
+            )
         }
     }
 }
