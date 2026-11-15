@@ -40,6 +40,9 @@ fun PantallaMesas(
     token: String,
     onCerrarSesion: () -> Unit
 ) {
+    var mostrarCarta by rememberSaveable{
+        mutableStateOf(false)
+    }
     var filtro by rememberSaveable {
         mutableStateOf("Todas")
     }
@@ -137,6 +140,17 @@ fun PantallaMesas(
         }
     }
 
+    if (mostrarCarta) {
+
+        // Mostrar la carta del restaurante
+        PantallaCarta(
+            token = token,
+            onVolver = {
+                mostrarCarta = false
+            }
+        )
+
+    } else {
     Scaffold(
         containerColor = Color.White,
 
@@ -221,22 +235,37 @@ fun PantallaMesas(
 
             //Boton para actualizar las mesas
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-
-                TextButton(
-                    onClick = {
-                        numeroActualizacion++
-                    },
-                    enabled = !cargando && !iniciandoAtencion
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Actualizar",
-                        color = Naranja
-                    )
+
+                    // HU05: Abrir la carta del restaurante
+                    TextButton(
+                        onClick = {
+                            mostrarCarta = true
+                        },
+                        enabled = !iniciandoAtencion
+                    ) {
+                        Text(
+                            text = "Ver carta",
+                            color = Naranja
+                        )
+                    }
+
+                    // HU03: Actualizar las mesas
+                    TextButton(
+                        onClick = {
+                            numeroActualizacion++
+                        },
+                        enabled = !cargando && !iniciandoAtencion
+                    ) {
+                        Text(
+                            text = "Actualizar",
+                            color = Naranja
+                        )
+                    }
                 }
-            }
 
             //Indicador de carga
             if (cargando) {
@@ -578,7 +607,7 @@ fun PantallaMesas(
         )
     }
 }
-
+}
 //Tarjeta individual de mesa
 @Composable
 private fun TarjetaMesa(
