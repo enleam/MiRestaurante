@@ -39,34 +39,7 @@ async function obtenerMesaPorId(req,res) {
     }
 }
 
-//HU04: iniciar la atencion de una mesa libre
-async function iniciarAtencion(req,res) {
-    try{
-        const {mesaId} = req.params;
-
-        //El mozo que inicia la atencion es el usuario del token
-        const mozoId = req.usuario.usuarioId;
-
-        const {atencion, mesa} = await mesaService.iniciarAtencion(mesaId, mozoId);
-
-        return res.status(201).json({
-            mensaje: "Atención iniciada correctamente",
-            atencion,
-            mesa
-        });
-    } catch(error){
-        console.error("Error al iniciar la atencion:",error);
-
-        return res.status(error.status || 500).json({
-            mensaje: error.status
-                ? error.message
-                : "Error interno al iniciar la atención"
-        });
-    }
-}
-
 module.exports={
     listarMesas,
-    obtenerMesaPorId,
-    iniciarAtencion
+    obtenerMesaPorId
 };
