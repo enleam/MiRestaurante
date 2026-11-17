@@ -85,6 +85,16 @@ fun PantallaMesas(
 
     val scope = rememberCoroutineScope()
 
+    // HU06: Controlar la navegacion a la pantalla de reservas
+    var mostrarReservas by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    // HU05: Controlar la navegacion a la carta
+    var mostrarCarta by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     //Consultar mesas al ingresar o presionar Actualizar
     LaunchedEffect(token, numeroActualizacion) {
         cargando = true
@@ -137,12 +147,32 @@ fun PantallaMesas(
         }
     }
 
+    // HU06: Mostrar reservas cuando el mozo seleccione el menu inferior
+    if (mostrarReservas) {
+        PantallaReservas(
+            token = token,
+            onVolver = { mostrarReservas = false }
+        )
+        return
+    }
+
+    // HU05: Mostrar la carta cuando el mozo seleccione Ver carta
+    if (mostrarCarta) {
+        PantallaCarta(
+            token = token,
+            onVolver = { mostrarCarta = false }
+        )
+        return
+    }
+
     Scaffold(
         containerColor = Color.White,
 
         //Menu inferior
         bottomBar = {
-            MenuInferiorMesas()
+            MenuInferiorMesas(
+                onAbrirReservas = { mostrarReservas = true }
+            )
         }
 
     ) { padding ->
@@ -219,11 +249,22 @@ fun PantallaMesas(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            //Boton para actualizar las mesas
+            // HU05: Acceso a la carta y boton para actualizar las mesas
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+
+                TextButton(
+                    onClick = { mostrarCarta = true },
+                    enabled = !iniciandoAtencion
+                ) {
+                    Text(
+                        text = "Ver carta",
+                        color = Naranja
+                    )
+                }
 
                 TextButton(
                     onClick = {
@@ -689,7 +730,7 @@ private fun TarjetaMesa(
 
 //Menu de navegacion inferior
 @Composable
-private fun MenuInferiorMesas() {
+private fun MenuInferiorMesas(onAbrirReservas: () -> Unit) {
 
     val opciones = listOf(
         Triple(
@@ -735,7 +776,12 @@ private fun MenuInferiorMesas() {
                 }
 
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            enabled = opcion.first == "Reservas",
+                            onClick = onAbrirReservas
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
