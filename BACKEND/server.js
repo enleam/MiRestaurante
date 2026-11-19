@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -9,36 +8,40 @@ const mesaRoutes = require("./routes/mesa.routes");
 const atencionRoutes = require("./routes/atencion.routes");
 const catalogoRoutes = require("./routes/catalogo.routes");
 const reservaRoutes = require("./routes/reserva.routes");
+const pedidoRoutes = require("./routes/pedido.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Permitir recibir datos en formato JSON
+//Permitir recibir datos en formato JSON
 app.use(express.json());
 
-// Verificar que la API funciona
+//Verificar que la API funciona
 app.get("/api/health", (req, res) => {
     res.status(200).json({
         mensaje: "Api de MiRestaurante funcionando correctamente"
     });
 });
 
-// Sprint 1: Autenticacion
+//Sprint 1: Autenticacion
 app.use("/api/auth", authRoutes);
 
-// HU03: Consultar mesas
+//HU03: Consultar mesas
 app.use("/api/mesas", mesaRoutes);
 
-// HU04: Iniciar atencion
+//HU04: Iniciar atencion
 app.use("/api/atenciones", atencionRoutes);
 
-// HU05: Consultar carta
+//HU05: Consultar carta
 app.use("/api/catalogo", catalogoRoutes);
 
-// HU06: Consultar reservas
+//HU06: Consultar reservas
 app.use("/api/reservas", reservaRoutes);
 
-// Iniciar el servidor
+//HU07: Registrar pedidos
+app.use("/api/pedidos", pedidoRoutes);
+
+//Iniciar el servidor
 async function iniciarServidor() {
     try {
         await conectarBD();
