@@ -164,8 +164,32 @@ async function listarPedidosPorAtencion(atencionId, mozoId) {
     return pedidos;
     
 }
+/*HU09: Enviar un pedido a cocina*/
+async function enviarPedidoACocina(pedidoId, mozoId) {
+
+    //Convertir y validar los identificadores
+    const idPedido = Number(pedidoId);
+    const idMozo = Number(mozoId);
+
+    if (!Number.isSafeInteger(idPedido) || idPedido <=0 ){
+        throw crearError("El ID del pedido es invalido", 400);
+    }
+
+    if(!Number.isSafeInteger(idMozo) || idMozo <=0){
+        throw crearError("El ID del mozo es invalido", 400);
+    }
+    
+    //Enviar el pedido mediante el modelo
+    const pedido = await pedidoModel.enviarPedidoACocina(
+        idPedido,
+        idMozo
+    );
+
+    return pedido;
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
-    listarPedidosPorAtencion
+    listarPedidosPorAtencion,
+    enviarPedidoACocina
 };

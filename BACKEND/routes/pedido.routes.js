@@ -20,6 +20,14 @@ router.get(
     pedidoController.listarPedidosPorAtencion
 );
 
+//HU09: Enviar pedido a cocinar
+router.patch(
+    "/:pedidoId/enviar",
+    verificarToken,
+    permitirRoles("MOZO"),
+    pedidoController.enviarPedidoACocina
+);
+
 router.put(
     "/:pedidoId",
     verificarToken,

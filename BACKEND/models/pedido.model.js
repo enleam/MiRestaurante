@@ -545,9 +545,123 @@ async function listarPedidosPorAtencion(atencionId, mozoId) {
 
     return Array.from(pedidosMap.values());
 }
+async function enviarPedidoACocina(pedidoId, mozoId) {
 
+    //Validar identificadores
+    if(
+        !Number.isInteger(pedidoId) || pedidoId <= 0 ||
+        !Number.isInteger(mozoId) || mozoId <= 0
+    ){
+        const error = new Error("Identificadores invalidos");
+        error.status = 400
+        throw error;
+    }
+    
+    const transaccion = new sql.Transaction();
+    let transaccionActiva = false;
+
+    try{
+        await transaccion.begin();
+        transaccionActiva=true;
+
+        //Verificar que el pedido pertenezca al mozo
+        //y que la atencion este abierta
+
+        const consultaPedido = await new sql.Request(transaccion)
+            .input("pedidoId", sql.Int, pedidoId)
+            .input("mozoId", sql.Int, mozoId)
+            .query(`
+                SELECT
+                    p.pedido_id AS pedidoId,
+                    p.atencion_id AS atencionId,
+                    p.estado,
+                    p.fecha_registro AS fechaRegistro,
+                    a.estado AS estadoAtencion
+                FROM pedidos.Pedido p WITH (UPDLOCK, HOLDLOCK)
+                INNER JOIN salon.AtencionMesa a WITH (UPDLOCK, HOLDLOCK)
+                    ON a.atencion_id = p.atencion_id
+                INNER JOIN seguridad.Usuario u
+                    ON u.usuario_id = p.registrado_por_id
+                INNER JOIN seguridad.Rol r
+                    ON r.rol_id = u.rol_id
+                WHERE p.pedido_id = @pedidoId
+                    AND p.registrado_por_id = @mozoId
+                    AND a.mozo_id = @mozoId
+                    AND u.estado = N'ACTIVO'
+                    AND r.nombre = N'MOZO'
+                `);
+            if(consultaPedido.recordset.length === 0){
+                const error = new Error(
+                    "El pedido no existe o no pertenece al mozo"
+                );
+                error.status = 404;
+                throw error;
+            }
+
+            const pedido=consultaPedido.recordset[0];
+
+            //Verificar que la atencion siga abierta
+            if(pedido.estadoAtencion !== "ABIERTA"){
+                const error = new Error(
+                    "La atencion ya no esta abierta"
+                );
+                error.status = 409;
+                throw error;
+            }
+
+            //Solo se pueden enviar pedidos registrados
+            if(pedido.estado !== "REGISTRADO"){
+                const error = new Error(
+                    "El pedido ya fue enviado o no permite envios"
+                );
+                error.status = 409;
+                throw error;
+            }
+
+            //Cambiar el estado del pedido a ENVIADO
+            const resultado = await new sql.Request(transaccion)
+                .input("pedidoId", sql.Int, pedidoId)
+                .query(`
+                    UPDATE pedidos.Pedido
+                    SET estado = N'ENVIADO'
+                    OUTPUT
+                        INSERTED.pedido_id AS pedidoId,
+                        INSERTED.atencion_id AS atencionId,
+                        INSERTED.estado,
+                        INSERTED.fecha_registro AS fechaRegistro
+                    WHERE pedido_id = @pedidoId
+                        AND estado = N'REGISTRADO'
+                    `);
+
+                if(resultado.recordset.length === 0){
+                    const error = new Error(
+                       "No se pudo enviar el pedido a cocina"
+                    );
+                    error.status = 409;
+                    throw error;
+                }
+                //Confirmar la transaccion
+                await transaccion.commit();
+                transaccionActiva = false;
+
+                return resultado.recordset[0];
+    }catch (error){
+        if(transaccionActiva){
+            try {
+                await transaccion.rollback();
+            }catch (rollbackError){
+                console.error(
+                    "Error al revertir envio del pedido:",
+                    rollbackError
+                );
+            }
+        }
+        throw error;
+    }
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
-    listarPedidosPorAtencion
+    listarPedidosPorAtencion,
+    enviarPedidoACocina
 };

@@ -132,9 +132,49 @@ async function listarPedidosPorAtencion(req, res) {
     }
 }
 
+/*HU09: Enviar pedido a cocina*/
+async function enviarPedidoACocina(req, res) {
+    try{
+        //Obtener el ID del pedido desde la URL 
+        const{pedidoId} = req.params;
 
+        //Obtener el mozo autenticado desde el JWT
+        const mozoId = req.usuario?.usuarioId;
+
+        //Verificar que el usuario este autenticado
+        if(!mozoId){
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+        }
+    //Enviar el pedido a cocina mediante el servicio
+    const pedido = await pedidoService.enviarPedidoACocina(
+        pedidoId,
+        mozoId
+    );
+    //Responder cuando el pedido se envie correctamente
+    return res.status(200).json({
+        mensaje: "Pedido enviado a cocina correctamente",
+        pedido
+    });
+
+} catch (error) {
+    if (error.status){
+        return res.status(error.status).json({
+            mensaje: error.message
+        });
+    }
+
+    console.error("Error al enviar pedido a cocina:", error);
+
+    return res.status(500).json({
+        mensaje: "Error interno al enviar el pedido a cocina"
+    });
+ }
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
-    listarPedidosPorAtencion
+    listarPedidosPorAtencion,
+    enviarPedidoACocina
 };
