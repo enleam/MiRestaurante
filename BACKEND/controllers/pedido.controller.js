@@ -1,43 +1,42 @@
+
 const pedidoService = require("../services/pedido.service");
 
-//Registrar un pedido
+// HU07: Registrar un pedido
 async function registrarPedido(req, res) {
     try {
-        //Obtener los datos enviados desde Android
+        // Obtener los datos enviados desde Android
         const { atencionId, productos } = req.body;
 
-        //Obtener el mozo desde el token JWT
+        // Obtener el mozo desde el token JWT
         const mozoId = req.usuario?.usuarioId;
 
-        //Verificar que el usuario este autenticado
+        // Verificar que el usuario este autenticado
         if (!mozoId) {
             return res.status(401).json({
                 mensaje: "Usuario no autenticado"
             });
         }
 
-        //Registrar el pedido mediante el servicio
+        // Registrar el pedido mediante el servicio
         const pedido = await pedidoService.registrarPedido(
             atencionId,
             mozoId,
             productos
         );
 
-        //Responder cuando el pedido se registre correctamente
+        // Responder cuando el pedido se registre correctamente
         return res.status(201).json({
             mensaje: "Pedido registrado correctamente",
             pedido
         });
 
     } catch (error) {
-        //Manejar errores de validacion
         if (error.status) {
             return res.status(error.status).json({
                 mensaje: error.message
             });
         }
 
-        //Manejar errores inesperados
         console.error("Error al registrar pedido:", error);
 
         return res.status(500).json({
@@ -46,6 +45,96 @@ async function registrarPedido(req, res) {
     }
 }
 
+async function modificarPedido(req, res) {
+    try {
+        const { pedidoId } = req.params;
+        const { productos } = req.body;
+        const mozoId = req.usuario?.usuarioId;
+
+        if (!mozoId) {
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+        }
+
+        const pedido = await pedidoService.modificarPedido(
+            pedidoId,
+            mozoId,
+            productos
+        );
+
+        return res.status(200).json({
+            mensaje: "Pedido modificado correctamente",
+            pedido
+        });
+
+    } catch (error) {
+
+        if (error.status) {
+            return res.status(error.status).json({
+                mensaje: error.message
+            });
+        }
+
+
+        console.error("Error al modificar pedido:", error);
+
+        return res.status(500).json({
+            mensaje: "Error interno al modificar el pedido"
+        });
+    }
+}
+
+
+/* HU08: Listar los pedidos de una atencion */
+async function listarPedidosPorAtencion(req, res) {
+    try {
+        // Obtener el ID de la atencion desde la URL
+        const { atencionId } = req.params;
+
+        // Obtener el mozo autenticado desde el JWT
+        const mozoId = req.usuario?.usuarioId;
+
+        // Verificar que el usuario este autenticado
+        if (!mozoId) {
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+        }
+
+        // Consultar los pedidos mediante el servicio
+        const pedidos = await pedidoService.listarPedidosPorAtencion(
+            atencionId,
+            mozoId
+        );
+
+        // Responder con los pedidos encontrados
+        return res.status(200).json({
+            mensaje: "Pedidos consultados correctamente",
+            pedidos
+        });
+
+    } catch (error) {
+
+        // Manejar errores de validacion y acceso
+        if (error.status) {
+            return res.status(error.status).json({
+                mensaje: error.message
+            });
+        }
+
+        // Manejar errores inesperados
+        console.error("Error al consultar pedidos:", error);
+
+        return res.status(500).json({
+            mensaje: "Error interno al consultar los pedidos"
+        });
+    }
+}
+
+
 module.exports = {
-    registrarPedido
+    registrarPedido,
+    modificarPedido,
+    listarPedidosPorAtencion
 };

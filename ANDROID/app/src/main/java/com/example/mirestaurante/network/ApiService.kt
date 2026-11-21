@@ -6,6 +6,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.PUT
 
 interface ApiService {
     //Sprint 1: Inicio de sesion
@@ -65,4 +66,18 @@ interface ApiService {
         @Path("mesaId") mesaId: Int,
         @Header("Authorization") token: String
     ): Response<AtencionAbiertaResponse>
+
+    @GET("api/pedidos/atencion/{atencionId}")
+    suspend fun listarPedidosPorAtencion(
+        @Path("atencionId") atencionId: Int,
+        @Header("Authorization") token: String
+    ): Response<ConsultarPedidosResponse>
+
+    // Modificar productos y cantidades de un pedido
+    @PUT("api/pedidos/{pedidoId}")
+    suspend fun modificarPedido(
+        @Path("pedidoId") pedidoId: Int,
+        @Header("Authorization") token: String,
+        @Body datos: ModificarPedidoRequest
+    ): Response<ModificarPedidoResponse>
 }

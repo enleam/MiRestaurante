@@ -1,26 +1,26 @@
+
 const pedidoModel = require("../models/pedido.model");
 
-//Crear un error con codigo HTTP
+
 function crearError(mensaje, estado) {
     const error = new Error(mensaje);
     error.status = estado;
     return error;
 }
 
-//Registrar un pedido
+
 async function registrarPedido(atencionId, mozoId, productos) {
 
-    //Validar la atencion
+
     if (!Number.isInteger(atencionId) || atencionId <= 0) {
         throw crearError("La atencion es invalida", 400);
     }
 
-    //Validar el mozo
     if (!Number.isInteger(mozoId) || mozoId <= 0) {
         throw crearError("El mozo es invalido", 400);
     }
 
-    //Verificar que existan productos
+
     if (!Array.isArray(productos) || productos.length === 0) {
         throw crearError(
             "El pedido debe contener al menos un producto",
@@ -30,7 +30,7 @@ async function registrarPedido(atencionId, mozoId, productos) {
 
     const productosRegistrados = new Set();
 
-    //Validar cada producto
+
     for (const producto of productos) {
 
         if (!producto ||
@@ -57,7 +57,7 @@ async function registrarPedido(atencionId, mozoId, productos) {
         productosRegistrados.add(producto.productoId);
     }
 
-    //Registrar el pedido usando el modelo
+   
     let pedido;
 
     try {
@@ -67,7 +67,7 @@ async function registrarPedido(atencionId, mozoId, productos) {
             productos
         );
     } catch (error) {
-        //Producto inexistente o no disponible
+
         if (/^El producto \d+ no existe o no esta disponible$/.test(error.message)) {
             throw crearError(error.message, 400);
         }
@@ -75,16 +75,97 @@ async function registrarPedido(atencionId, mozoId, productos) {
         throw error;
     }
 
-    //Validar que la atencion permita registrar pedidos
+
     if (!pedido) {
         throw crearError(
             "La atencion no esta abierta o no corresponde al mozo",
             409
         );
     }
+
     return pedido;
 }
 
+
+async function modificarPedido(pedidoId, mozoId, productos) {
+
+
+    const idPedido = Number(pedidoId);
+    const idMozo = Number(mozoId);
+
+    if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
+        throw crearError("El ID del pedido es invalido", 400);
+    }
+
+    if (!Number.isSafeInteger(idMozo) || idMozo <= 0) {
+        throw crearError("El ID del mozo es invalido", 400);
+    }
+
+    if (!Array.isArray(productos) || productos.length === 0) {
+        throw crearError(
+            "El pedido debe contener al menos un producto",
+            400
+        );
+    }
+
+    const productosRegistrados = new Set();
+
+    for (const producto of productos) {
+
+        if (!producto ||
+            !Number.isInteger(producto.productoId) ||
+            producto.productoId <= 0) {
+            throw crearError("El producto es invalido", 400);
+        }
+
+        if (!Number.isInteger(producto.cantidad) ||
+            producto.cantidad <= 0) {
+            throw crearError(
+                "La cantidad debe ser mayor que cero",
+                400
+            );
+        }
+        if (productosRegistrados.has(producto.productoId)) {
+            throw crearError(
+                "No se puede repetir un producto en el pedido",
+                400
+            );
+        }
+
+        productosRegistrados.add(producto.productoId);
+    }
+
+    const pedido = await pedidoModel.modificarPedido(
+        idPedido,
+        idMozo,
+        productos
+    );
+
+    return pedido;
+}
+
+async function listarPedidosPorAtencion(atencionId, mozoId) {
+    const idAtencion = Number(atencionId);
+    const idMozo = Number(mozoId);
+
+    if(!Number.isSafeInteger(idAtencion)|| idAtencion <= 0){
+        throw crearError("El ID de la atencion es invalido", 400);
+    }
+
+    if(!Number.isSafeInteger(idMozo)|| idMozo <= 0){
+        throw crearError("El ID del mozo es invalido", 400);
+    }
+
+    const pedidos = await pedidoModel.listarPedidosPorAtencion(
+        idAtencion,
+        idMozo
+    );
+
+    return pedidos;
+    
+}
 module.exports = {
-    registrarPedido
+    registrarPedido,
+    modificarPedido,
+    listarPedidosPorAtencion
 };

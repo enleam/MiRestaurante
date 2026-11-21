@@ -1,18 +1,18 @@
+
 package com.example.mirestaurante.network
 
-//Producto que el mozo agrega al pedido
+// HU07: Registrar pedidos
+
 data class ProductoPedidoRequest(
     val productoId: Int,
     val cantidad: Int
 )
 
-//Datos que Android envia al backend
 data class RegistrarPedidoRequest(
     val atencionId: Int,
     val productos: List<ProductoPedidoRequest>
 )
 
-//Informacion de cada producto registrado
 data class DetallePedidoResponse(
     val detalleId: Int,
     val productoId: Int,
@@ -22,7 +22,6 @@ data class DetallePedidoResponse(
     val subtotal: Double
 )
 
-//Informacion del pedido registrado
 data class PedidoRegistrado(
     val pedidoId: Int,
     val atencionId: Int,
@@ -32,8 +31,43 @@ data class PedidoRegistrado(
     val total: Double
 )
 
-//Respuesta que devuelve el backend
 data class RegistrarPedidoResponse(
     val mensaje: String,
     val pedido: PedidoRegistrado
+)
+
+// HU08: Consultar pedidos
+
+data class PedidoConsultado(
+    val pedidoId: Int,
+    val atencionId: Int,
+    val estado: String,
+    val fechaRegistro: String,
+    val modificable: Boolean,
+    val productos: List<DetallePedidoResponse>,
+    val total: Double
+)
+
+data class ConsultarPedidosResponse(
+    val mensaje: String,
+    val pedidos: List<PedidoConsultado>
+)
+
+// HU08: Modificar pedidos
+
+data class ModificarPedidoRequest(
+    val productos: List<ProductoPedidoRequest>
+)
+
+data class PedidoModificado(
+    val pedidoId: Int,
+    val atencionId: Int,
+    val estado: String,
+    val productos: List<DetallePedidoResponse>,
+    val total: Double
+)
+
+data class ModificarPedidoResponse(
+    val mensaje: String,
+    val pedido: PedidoModificado
 )

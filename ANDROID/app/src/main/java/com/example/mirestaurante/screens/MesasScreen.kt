@@ -93,6 +93,16 @@ fun PantallaMesas(
         mutableStateOf<Int?>(null)
     }
 
+    //HU08: Atencion de la mesa ocupada para mostrar opciones
+    var atencionOpcionesId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    //HU08: Atencion para consultar pedidos existentes
+    var atencionConsultaId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
     val scope = rememberCoroutineScope()
 
     //HU06: Navegacion a reservas
@@ -187,6 +197,21 @@ fun PantallaMesas(
             atencionId = idAtencionParaPedido,
             onVolver = {
                 atencionPedidoId = null
+                numeroActualizacion++
+            }
+        )
+        return
+    }
+
+    //HU08: Mostrar la lista de pedidos de la atencion
+    val idAtencionParaConsulta = atencionConsultaId
+
+    if (idAtencionParaConsulta != null) {
+        PantallaPedidosAtencion(
+            token = token,
+            atencionId = idAtencionParaConsulta,
+            onVolver = {
+                atencionConsultaId = null
                 numeroActualizacion++
             }
         )
@@ -537,8 +562,8 @@ fun PantallaMesas(
                                                 atencion.estado == "ABIERTA"
                                             ) {
 
-                                                //Abrir la pantalla de pedidos
-                                                atencionPedidoId =
+                                                //HU08: Elegir entre registrar o consultar pedidos
+                                                atencionOpcionesId =
                                                     atencion.atencionId
 
                                             } else {
@@ -596,6 +621,43 @@ fun PantallaMesas(
                 }
             }
         }
+    }
+
+    //HU08: Opciones disponibles al seleccionar una mesa ocupada
+    val idAtencionOpciones = atencionOpcionesId
+
+    if (idAtencionOpciones != null) {
+        AlertDialog(
+            onDismissRequest = {
+                atencionOpcionesId = null
+            },
+            title = {
+                Text("Pedidos de la mesa")
+            },
+            text = {
+                Text("¿Qué deseas hacer con esta atención?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        atencionOpcionesId = null
+                        atencionPedidoId = idAtencionOpciones
+                    }
+                ) {
+                    Text("Registrar pedido", color = Naranja)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        atencionOpcionesId = null
+                        atencionConsultaId = idAtencionOpciones
+                    }
+                ) {
+                    Text("Ver y modificar", color = Naranja)
+                }
+            }
+        )
     }
 
     //HU04: Cuadro de confirmacion
@@ -841,7 +903,7 @@ private fun TarjetaMesa(
                     text = if (mesa.estado == "LIBRE") {
                         "Toca para iniciar atención"
                     } else {
-                        "Toca para registrar pedido"
+                        "Toca para gestionar pedidos"
                     },
                     fontSize = 10.sp,
                     color = if (mesa.estado == "LIBRE") {
