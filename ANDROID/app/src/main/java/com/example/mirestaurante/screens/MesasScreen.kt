@@ -40,9 +40,6 @@ fun PantallaMesas(
     token: String,
     onCerrarSesion: () -> Unit
 ) {
-    var mostrarCarta by rememberSaveable{
-        mutableStateOf(false)
-    }
     var filtro by rememberSaveable {
         mutableStateOf("Todas")
     }
@@ -66,10 +63,10 @@ fun PantallaMesas(
     }
 
     var numeroActualizacion by remember {
-        mutableStateOf(0)
+        mutableIntStateOf(0)
     }
 
-    //HU04: Seleccion y registro de la atencion
+    //HU04: Seleccion e inicio de atencion
     var mesaSeleccionada by remember {
         mutableStateOf<Mesa?>(null)
     }
@@ -86,9 +83,39 @@ fun PantallaMesas(
         mutableStateOf(false)
     }
 
+    //HU07: Consulta de atenciones abiertas
+    var consultandoAtencion by remember {
+        mutableStateOf(false)
+    }
+
+    //HU07: Atencion seleccionada para registrar pedidos
+    var atencionPedidoId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    //HU08: Atencion de la mesa ocupada para mostrar opciones
+    var atencionOpcionesId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    //HU08: Atencion para consultar pedidos existentes
+    var atencionConsultaId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
     val scope = rememberCoroutineScope()
 
-    //Consultar mesas al ingresar o presionar Actualizar
+    //HU06: Navegacion a reservas
+    var mostrarReservas by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    //HU05: Navegacion a la carta
+    var mostrarCarta by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    //Consultar mesas desde el backend
     LaunchedEffect(token, numeroActualizacion) {
         cargando = true
         mensajeError = ""
@@ -107,7 +134,6 @@ fun PantallaMesas(
                     mensajeError =
                         "El servidor no devolvio datos de mesas"
                 }
-
             } else {
                 mensajeError = when (respuesta.code()) {
                     401 -> "La sesion ha expirado. Inicia sesion nuevamente"
@@ -140,26 +166,71 @@ fun PantallaMesas(
         }
     }
 
-    if (mostrarCarta) {
+    //HU06: Mostrar pantalla de reservas
+    if (mostrarReservas) {
+        PantallaReservas(
+            token = token,
+            onVolver = {
+                mostrarReservas = false
+            }
+        )
+        return
+    }
 
-        // Mostrar la carta del restaurante
+    //HU05: Mostrar pantalla de carta
+    if (mostrarCarta) {
         PantallaCarta(
             token = token,
             onVolver = {
                 mostrarCarta = false
             }
         )
+        return
+    }
 
-    } else {
+    //HU07: Mostrar pantalla para registrar pedidos
+    val idAtencionParaPedido = atencionPedidoId
+
+    if (idAtencionParaPedido != null) {
+        PantallaRegistrarPedido(
+            token = token,
+            atencionId = idAtencionParaPedido,
+            onVolver = {
+                atencionPedidoId = null
+                numeroActualizacion++
+            }
+        )
+        return
+    }
+
+    //HU08: Mostrar la lista de pedidos de la atencion
+    val idAtencionParaConsulta = atencionConsultaId
+
+    if (idAtencionParaConsulta != null) {
+        PantallaPedidosAtencion(
+            token = token,
+            atencionId = idAtencionParaConsulta,
+            onVolver = {
+                atencionConsultaId = null
+                numeroActualizacion++
+            }
+        )
+        return
+    }
+
     Scaffold(
         containerColor = Color.White,
 
         //Menu inferior
         bottomBar = {
-            MenuInferiorMesas()
+            MenuInferiorMesas(
+                onAbrirReservas = {
+                    mostrarReservas = true
+                }
+            )
         }
-
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -175,7 +246,6 @@ fun PantallaMesas(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 Column {
                     Text(
                         text = "Gestión de mesas",
@@ -217,7 +287,6 @@ fun PantallaMesas(
                             menuUsuarioAbierto = false
                         }
                     ) {
-
                         DropdownMenuItem(
                             text = {
                                 Text("Cerrar sesión")
@@ -233,43 +302,42 @@ fun PantallaMesas(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            //Boton para actualizar las mesas
+            //HU05: Acceso a carta y actualizar mesas
             Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = {
+                        mostrarCarta = true
+                    },
+                    enabled = !iniciandoAtencion &&
+                            !consultandoAtencion
                 ) {
-
-                    // HU05: Abrir la carta del restaurante
-                    TextButton(
-                        onClick = {
-                            mostrarCarta = true
-                        },
-                        enabled = !iniciandoAtencion
-                    ) {
-                        Text(
-                            text = "Ver carta",
-                            color = Naranja
-                        )
-                    }
-
-                    // HU03: Actualizar las mesas
-                    TextButton(
-                        onClick = {
-                            numeroActualizacion++
-                        },
-                        enabled = !cargando && !iniciandoAtencion
-                    ) {
-                        Text(
-                            text = "Actualizar",
-                            color = Naranja
-                        )
-                    }
+                    Text(
+                        text = "Ver carta",
+                        color = Naranja
+                    )
                 }
 
-            //Indicador de carga
-            if (cargando) {
+                TextButton(
+                    onClick = {
+                        numeroActualizacion++
+                    },
+                    enabled = !cargando &&
+                            !iniciandoAtencion &&
+                            !consultandoAtencion
+                ) {
+                    Text(
+                        text = "Actualizar",
+                        color = Naranja
+                    )
+                }
+            }
 
+            //Indicador de carga de mesas
+            if (cargando) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = Naranja
@@ -278,9 +346,24 @@ fun PantallaMesas(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            //HU07: Indicador de consulta de atencion
+            if (consultandoAtencion) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Naranja
+                )
+
+                Text(
+                    text = "Consultando atención de la mesa...",
+                    fontSize = 13.sp,
+                    color = GrisTexto
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             //Mensaje de error al consultar mesas
             if (mensajeError.isNotBlank()) {
-
                 Text(
                     text = mensajeError,
                     color = Color(0xFFB3261E)
@@ -298,9 +381,8 @@ fun PantallaMesas(
                 }
             }
 
-            //Resultado de iniciar una atencion
+            //Mensajes de atencion
             if (mensajeAtencion.isNotBlank()) {
-
                 Text(
                     text = mensajeAtencion,
                     color = if (esErrorAtencion) {
@@ -319,7 +401,6 @@ fun PantallaMesas(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
                 val resumen = listOf(
                     Triple(
                         "Libres",
@@ -339,7 +420,6 @@ fun PantallaMesas(
                 )
 
                 resumen.forEach { item ->
-
                     Surface(
                         modifier = Modifier
                             .weight(1f)
@@ -351,12 +431,10 @@ fun PantallaMesas(
                             GrisBorde
                         )
                     ) {
-
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-
                             Text(
                                 text = item.second.toString(),
                                 color = item.third,
@@ -389,14 +467,12 @@ fun PantallaMesas(
                     ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
                 listOf(
                     "Todas",
                     "Libres",
                     "Ocupadas",
                     "Reservadas"
                 ).forEach { opcion ->
-
                     FilterChip(
                         selected = filtro == opcion,
                         onClick = {
@@ -422,13 +498,12 @@ fun PantallaMesas(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            //Mensaje cuando no hay mesas para el filtro
+            //Mensaje cuando el filtro no tiene mesas
             if (
                 !cargando &&
                 mensajeError.isBlank() &&
                 mesasFiltradas.isEmpty()
             ) {
-
                 Text(
                     text = "No hay mesas para el filtro seleccionado",
                     color = GrisTexto,
@@ -444,18 +519,103 @@ fun PantallaMesas(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 12.dp)
             ) {
-
                 items(
                     mesasFiltradas,
                     key = { it.mesaId }
                 ) { mesa ->
-
                     TarjetaMesa(
                         mesa = mesa,
-                        habilitada = !cargando && !iniciandoAtencion,
+                        habilitada = !cargando &&
+                                !iniciandoAtencion &&
+                                !consultandoAtencion,
+
                         onSeleccionar = {
                             mensajeAtencion = ""
-                            mesaSeleccionada = mesa
+
+                            if (mesa.estado == "LIBRE") {
+
+                                //HU04: Iniciar una atencion
+                                mesaSeleccionada = mesa
+
+                            } else if (mesa.estado == "OCUPADA") {
+
+                                //HU07: Obtener la atencion abierta
+                                scope.launch {
+                                    consultandoAtencion = true
+
+                                    try {
+                                        val respuesta =
+                                            RetrofitClient.api.obtenerAtencionAbierta(
+                                                mesaId = mesa.mesaId,
+                                                token = "Bearer $token"
+                                            )
+
+                                        if (respuesta.isSuccessful) {
+
+                                            val atencion =
+                                                respuesta.body()?.atencion
+
+                                            if (
+                                                atencion != null &&
+                                                atencion.atencionId > 0 &&
+                                                atencion.mesaId == mesa.mesaId &&
+                                                atencion.estado == "ABIERTA"
+                                            ) {
+
+                                                //HU08: Elegir entre registrar o consultar pedidos
+                                                atencionOpcionesId =
+                                                    atencion.atencionId
+
+                                            } else {
+                                                esErrorAtencion = true
+                                                mensajeAtencion =
+                                                    "No se encontró una atención abierta válida"
+                                            }
+
+                                        } else {
+                                            esErrorAtencion = true
+
+                                            mensajeAtencion =
+                                                when (respuesta.code()) {
+                                                    400 ->
+                                                        "El ID de la mesa no es válido"
+
+                                                    401 ->
+                                                        "Tu sesión ha expirado. Inicia sesión nuevamente"
+
+                                                    403 ->
+                                                        "No tienes permiso para consultar atenciones"
+
+                                                    404 ->
+                                                        "Esta mesa no tiene una atención abierta a tu cargo"
+
+                                                    else ->
+                                                        "No se pudo consultar la atención (${respuesta.code()})"
+                                                }
+
+                                            if (respuesta.code() == 404) {
+                                                numeroActualizacion++
+                                            }
+                                        }
+
+                                    } catch (error: IOException) {
+                                        esErrorAtencion = true
+                                        mensajeAtencion =
+                                            "No se pudo conectar con el servidor"
+
+                                    } catch (error: CancellationException) {
+                                        throw error
+
+                                    } catch (error: Exception) {
+                                        esErrorAtencion = true
+                                        mensajeAtencion =
+                                            "Ocurrió un error al consultar la atención"
+
+                                    } finally {
+                                        consultandoAtencion = false
+                                    }
+                                }
+                            }
                         }
                     )
                 }
@@ -463,11 +623,47 @@ fun PantallaMesas(
         }
     }
 
+    //HU08: Opciones disponibles al seleccionar una mesa ocupada
+    val idAtencionOpciones = atencionOpcionesId
+
+    if (idAtencionOpciones != null) {
+        AlertDialog(
+            onDismissRequest = {
+                atencionOpcionesId = null
+            },
+            title = {
+                Text("Pedidos de la mesa")
+            },
+            text = {
+                Text("¿Qué deseas hacer con esta atención?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        atencionOpcionesId = null
+                        atencionPedidoId = idAtencionOpciones
+                    }
+                ) {
+                    Text("Registrar pedido", color = Naranja)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        atencionOpcionesId = null
+                        atencionConsultaId = idAtencionOpciones
+                    }
+                ) {
+                    Text("Ver y modificar", color = Naranja)
+                }
+            }
+        )
+    }
+
     //HU04: Cuadro de confirmacion
     val mesa = mesaSeleccionada
 
     if (mesa != null) {
-
         AlertDialog(
             onDismissRequest = {
                 if (!iniciandoAtencion) {
@@ -496,7 +692,6 @@ fun PantallaMesas(
                     onClick = {
 
                         scope.launch {
-
                             iniciandoAtencion = true
                             mensajeAtencion = ""
 
@@ -527,29 +722,27 @@ fun PantallaMesas(
                                     numeroActualizacion++
 
                                 } else {
-
                                     mesaSeleccionada = null
                                     esErrorAtencion = true
 
-                                    mensajeAtencion = when (
-                                        respuesta.code()
-                                    ) {
+                                    mensajeAtencion =
+                                        when (respuesta.code()) {
 
-                                        400 ->
-                                            "El ID de la mesa no es válido"
+                                            400 ->
+                                                "El ID de la mesa no es válido"
 
-                                        401 ->
-                                            "Tu sesión ha expirado. Inicia sesión nuevamente"
+                                            401 ->
+                                                "Tu sesión ha expirado. Inicia sesión nuevamente"
 
-                                        403 ->
-                                            "No tienes permiso para iniciar atenciones"
+                                            403 ->
+                                                "No tienes permiso para iniciar atenciones"
 
-                                        409 ->
-                                            "La mesa ya no está libre. Actualizando su estado..."
+                                            409 ->
+                                                "La mesa ya no está libre. Actualizando su estado..."
 
-                                        else ->
-                                            "No se pudo iniciar la atención (${respuesta.code()})"
-                                    }
+                                            else ->
+                                                "No se pudo iniciar la atención (${respuesta.code()})"
+                                        }
 
                                     if (respuesta.code() == 409) {
                                         numeroActualizacion++
@@ -557,7 +750,6 @@ fun PantallaMesas(
                                 }
 
                             } catch (error: IOException) {
-
                                 mesaSeleccionada = null
                                 esErrorAtencion = true
 
@@ -568,7 +760,6 @@ fun PantallaMesas(
                                 throw error
 
                             } catch (error: Exception) {
-
                                 mesaSeleccionada = null
                                 esErrorAtencion = true
 
@@ -581,7 +772,6 @@ fun PantallaMesas(
                         }
                     }
                 ) {
-
                     if (iniciandoAtencion) {
                         CircularProgressIndicator(
                             color = Color.White,
@@ -607,7 +797,7 @@ fun PantallaMesas(
         )
     }
 }
-}
+
 //Tarjeta individual de mesa
 @Composable
 private fun TarjetaMesa(
@@ -615,7 +805,6 @@ private fun TarjetaMesa(
     habilitada: Boolean,
     onSeleccionar: () -> Unit
 ) {
-
     val colorEstado = when (mesa.estado) {
         "LIBRE" -> Verde
         "OCUPADA" -> Naranja
@@ -635,7 +824,11 @@ private fun TarjetaMesa(
             .fillMaxWidth()
             .height(158.dp)
             .clickable(
-                enabled = habilitada && mesa.estado == "LIBRE",
+                enabled = habilitada &&
+                        (
+                                mesa.estado == "LIBRE" ||
+                                        mesa.estado == "OCUPADA"
+                                ),
                 onClick = onSeleccionar
             ),
         shape = RoundedCornerShape(14.dp),
@@ -645,12 +838,10 @@ private fun TarjetaMesa(
             GrisBorde
         )
     ) {
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-
             Icon(
                 painter = painterResource(
                     R.drawable.ic_mesa
@@ -674,7 +865,6 @@ private fun TarjetaMesa(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -702,14 +892,25 @@ private fun TarjetaMesa(
                 color = GrisTexto
             )
 
-            if (mesa.estado == "LIBRE") {
-
+            //HU04 y HU07: Acciones disponibles
+            if (
+                mesa.estado == "LIBRE" ||
+                mesa.estado == "OCUPADA"
+            ) {
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Toca para iniciar atención",
+                    text = if (mesa.estado == "LIBRE") {
+                        "Toca para iniciar atención"
+                    } else {
+                        "Toca para gestionar pedidos"
+                    },
                     fontSize = 10.sp,
-                    color = Verde
+                    color = if (mesa.estado == "LIBRE") {
+                        Verde
+                    } else {
+                        Naranja
+                    }
                 )
             }
         }
@@ -718,8 +919,9 @@ private fun TarjetaMesa(
 
 //Menu de navegacion inferior
 @Composable
-private fun MenuInferiorMesas() {
-
+private fun MenuInferiorMesas(
+    onAbrirReservas: () -> Unit
+) {
     val opciones = listOf(
         Triple(
             "Mesas",
@@ -754,7 +956,6 @@ private fun MenuInferiorMesas() {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             opciones.forEach { opcion ->
 
                 val color = if (opcion.third) {
@@ -764,7 +965,12 @@ private fun MenuInferiorMesas() {
                 }
 
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            enabled = opcion.first == "Reservas",
+                            onClick = onAbrirReservas
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -778,9 +984,7 @@ private fun MenuInferiorMesas() {
                         modifier = Modifier.size(24.dp)
                     )
 
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
                         text = opcion.first,

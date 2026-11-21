@@ -63,11 +63,39 @@ async function iniciarAtencion(mesaId, mozoId) {
                 console.error("Error al revertir:", rollbackError);
             }
         }
-
         throw error;
     }
 }
 
+//HU07: Consultar la atencion abierta de una mesa
+async function obtenerAtencionAbierta(mesaId, mozoId) {
+    const resultado = await new sql.Request()
+        .input("mesaId", sql.Int, mesaId)
+        .input("mozoId", sql.Int, mozoId)
+        .query(`
+            SELECT
+                a.atencion_id AS atencionId,
+                a.mesa_id AS mesaId,
+                m.numero AS numeroMesa,
+                a.estado
+            FROM salon.AtencionMesa a
+            INNER JOIN salon.Mesa m
+                ON m.mesa_id = a.mesa_id
+            WHERE a.mesa_id = @mesaId
+              AND a.mozo_id = @mozoId
+              AND a.estado = N'ABIERTA'
+              AND m.estado = N'OCUPADA'
+              AND m.activa = 1
+        `);
+
+    if (resultado.recordset.length === 0) {
+        return null;
+    }
+
+    return resultado.recordset[0];
+}
+
 module.exports = {
-    iniciarAtencion
+    iniciarAtencion,
+    obtenerAtencionAbierta
 };

@@ -7,41 +7,49 @@ const authRoutes = require("./routes/auth.routes");
 const mesaRoutes = require("./routes/mesa.routes");
 const atencionRoutes = require("./routes/atencion.routes");
 const catalogoRoutes = require("./routes/catalogo.routes");
+const reservaRoutes = require("./routes/reserva.routes");
+const pedidoRoutes = require("./routes/pedido.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Permitir recibir datos en formato JSON
+//Permitir recibir datos en formato JSON
 app.use(express.json());
 
-// Ruta para comprobar que la API funciona
+//Verificar que la API funciona
 app.get("/api/health", (req, res) => {
     res.status(200).json({
         mensaje: "Api de MiRestaurante funcionando correctamente"
     });
 });
 
-// Rutas de autenticacion
+//Sprint 1: Autenticacion
 app.use("/api/auth", authRoutes);
 
-// Rutas de mesas
+//HU03: Consultar mesas
 app.use("/api/mesas", mesaRoutes);
 
-// Rutas de atenciones
+//HU04: Iniciar atencion
 app.use("/api/atenciones", atencionRoutes);
 
-// Rutas del catalogo
+//HU05: Consultar carta
 app.use("/api/catalogo", catalogoRoutes);
 
-// Iniciar el servidor
+//HU06: Consultar reservas
+app.use("/api/reservas", reservaRoutes);
+
+//HU07: Registrar pedidos
+app.use("/api/pedidos", pedidoRoutes);
+
+//Iniciar el servidor
 async function iniciarServidor() {
     try {
-        // Conectar con SQL Server
         await conectarBD();
 
-        // Iniciar Express
         app.listen(PORT, () => {
-            console.log(`Servidor ejecutandose en http://localhost:${PORT}`);
+            console.log(
+                `Servidor ejecutandose en http://localhost:${PORT}`
+            );
         });
 
     } catch (error) {
@@ -49,6 +57,7 @@ async function iniciarServidor() {
             "No se pudo iniciar el servidor:",
             error.message
         );
+
         process.exit(1);
     }
 }

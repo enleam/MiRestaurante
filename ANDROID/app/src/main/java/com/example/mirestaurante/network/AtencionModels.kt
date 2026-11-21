@@ -19,3 +19,17 @@ data class AtencionResponse(
     val mensaje: String,
     val atencion: Atencion
 )
+
+//HU07: Datos de la atencion abierta de una mesa
+data class AtencionAbierta(
+    val atencionId: Int,
+    val mesaId: Int,
+    val numeroMesa: Int,
+    val estado: String
+)
+
+//HU07: Respuesta al consultar la atencion abierta
+data class AtencionAbiertaResponse(
+    val mensaje: String,
+    val atencion: AtencionAbierta
+)
