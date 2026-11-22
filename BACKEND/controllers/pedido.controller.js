@@ -172,9 +172,88 @@ async function enviarPedidoACocina(req, res) {
     });
  }
 }
+/*HU09: Consultar pedidos desde cocina*/
+async function listarPedidosCocina(req, res) {
+    try{
+
+        //Obtener el usuario de cocina desde el JWT
+        const cocinaId = req.usuario?.usuarioId;
+        if(!cocinaId){
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+        }
+        //Consultar pedidos enviados a cocina
+        const pedidos = await pedidoService.listarPedidosCocina(
+            cocinaId
+        );
+        return res.status(200).json({
+            mensaje: "Pedidos de cocina consultados correctamente",
+            pedidos
+        });
+    }catch (error){
+        if(error.status){
+            return res.status(error.status).json({
+                mensaje: error.message
+            });
+        }
+
+        console.error("Error al consultar pedidos de cocina;", error);
+        return res.status(500).json({
+            mensaje: "Error interno al consultar los pedidos de cocina"
+        });
+    }
+    
+}
+
+/*HU09: Actualizar estado del pedido desde cocina*/
+async function actualizarEstadoPedidoCocina(req, res) {
+    try{
+        //Obtener el ID del pedido desde la URL
+        const {pedidoId} = req.params;
+
+        //Obtener el nuevo estado enviado por Android
+        const {nuevoEstado} = req.body || {};
+
+        //Obtener el usuario de cocina desde el JWT
+        const cocinaId = req.usuario?.usuarioId;
+
+        if(!cocinaId){
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+        }
+        //Actualizar el estado mediante el servicio
+
+        const pedido = await pedidoService.actualizarEstadoPedidoCocina(
+            pedidoId,
+            cocinaId,
+            nuevoEstado
+        );
+
+        return res.status(200).json({
+            mensaje: "Estado del pedido actualizado correctamente",
+            pedido
+        })
+    } catch (error){
+        if (error.status){
+            return res.status(error.status).json({
+                mensaje: error.message
+            });
+        }
+        console.error("Error al actualizar pedido de cocina", error);
+
+        return res.status(500).json({
+            mensaje: "Error interno al actualizar el pedido"
+        });
+    }
+    
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
     listarPedidosPorAtencion,
-    enviarPedidoACocina
+    enviarPedidoACocina,
+    listarPedidosCocina,
+    actualizarEstadoPedidoCocina
 };

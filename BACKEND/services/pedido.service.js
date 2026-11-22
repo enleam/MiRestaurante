@@ -187,9 +187,73 @@ async function enviarPedidoACocina(pedidoId, mozoId) {
 
     return pedido;
 }
+
+//HU09:Enviar pedido a cocina (desde el mozo)
+async function enviarPedidoACocina(pedidoId, mozoId) {
+
+    const idPedido = Number(pedidoId);
+    const idMozo = Number(mozoId);
+
+    if(!Number.isSafeInteger(idPedido) || idPedido <= 0){
+        throw crearError("El ID del pedido es invalido", 400);
+    }
+
+    if(!Number.isSafeInteger(idMozo) || idMozo <= 0){
+        throw crearError("El ID del mozo es invalido",400);
+    }
+
+    return await pedidoModel.enviarPedidoACocina(
+        idPedido,
+        idMozo
+    );
+    
+}
+
+//HU09: Consultar pedidos desde cocina
+async function listarPedidosCocina(cocinaId) {
+    const idCocina = Number(cocinaId);
+    if(!Number.isSafeInteger(idCocina) || idCocina <=0){
+        throw crearError("El ID de cocina es invalido", 400);
+    }
+
+    return await pedidoModel.listarPedidosCocina(idCocina);
+}
+
+//HU09: Actualizar estado del pedido desde cocina
+
+async function actualizarEstadoPedidoCocina(
+    pedidoId,
+    cocinaId,
+    nuevoEstado
+) {
+
+    const idPedido = Number(pedidoId);
+    const idCocina = Number(cocinaId);
+    
+    if(!Number.isSafeInteger(idPedido) || idPedido <=0){
+        throw crearError("El ID del pedido es invalido", 400);
+    }
+    if(!Number.isSafeInteger(idCocina) || idCocina <=0){
+        throw crearError(" El ID de cocina es invalido", 400);
+    }
+    if(
+        nuevoEstado !== "EN_PREPARACION" &&
+        nuevoEstado !== "LISTO"
+    ){
+        throw crearError("El estado solicitado no es valido",400);
+    }
+
+    return await pedidoModel.actualizarEstadoPedidoCocina(
+        idPedido,
+        idCocina,
+        nuevoEstado
+    );
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
     listarPedidosPorAtencion,
-    enviarPedidoACocina
+    enviarPedidoACocina,
+    listarPedidosCocina,
+    actualizarEstadoPedidoCocina
 };
