@@ -7,6 +7,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.PUT
+import retrofit2.http.PATCH
 
 interface ApiService {
     //Sprint 1: Inicio de sesion
@@ -80,4 +81,24 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body datos: ModificarPedidoRequest
     ): Response<ModificarPedidoResponse>
+
+    //HU09: Enviar pedido a cocina
+    @PATCH ("api/pedidos/{pedidoId}/enviar")
+    suspend fun enviarPedidoACocina(
+        @Path("pedidoId") pedidoId: Int,
+        @Header("Authorization") token: String
+    ): Response<EnviarPedidoResponse>
+
+    //Consultar pedidos enviados a cocina
+    @GET("api/pedidos/cocina")
+    suspend fun listarPedidosCocina(
+        @Header("Authorization") token: String
+    ): Response<ConsultarPedidosCocinaResponse>
+
+    @PATCH("api/pedidos/{pedidoId}/estado")
+    suspend fun actualizarEstadoPedidoCocina(
+        @Path("pedidoId") pedidoId: Int,
+        @Header("Authorization") token: String,
+        @Body datos: ActualizarEstadoPedidoRequest
+    ): Response<ActualizarEstadoPedidoResponse>
 }

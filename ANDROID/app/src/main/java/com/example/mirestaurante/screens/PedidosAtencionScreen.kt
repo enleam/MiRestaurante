@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mirestaurante.network.PedidoConsultado
 import com.example.mirestaurante.network.RetrofitClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.util.Locale
 
@@ -38,9 +39,18 @@ fun PantallaPedidosAtencion(
         mutableStateOf("")
     }
 
+    var mensajeExito by remember {
+        mutableStateOf("")
+    }
+
+    var pedidoEnviandoId by remember {
+        mutableStateOf<Int?>(null)
+    }
     var actualizacion by remember {
         mutableIntStateOf(0)
     }
+
+    val scope = rememberCoroutineScope ()
 
     // Pedido seleccionado para modificar
     var pedidoSeleccionado by remember {
@@ -154,7 +164,16 @@ fun PantallaPedidosAtencion(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+            // HU09: Mostrar confirmacion del envio
 
+            if (mensajeExito.isNotBlank()){
+                Text(
+                    text = mensajeExito,
+                    color = Color(0xFF2E7D32),
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             if (cargando) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth()
@@ -272,6 +291,83 @@ fun PantallaPedidosAtencion(
                                         "Modificar pedido"
                                     else
                                         "No modificable"
+                                )
+                            }
+                            //HU09: Enviar pedido a cocina
+                            if (pedido.estado == "REGISTRADO") {
+
+                                Spacer(
+                                    modifier = Modifier.height(8.dp)
+                                )
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            pedidoEnviandoId = pedido.pedidoId
+                                            mensajeError = ""
+                                            mensajeExito = ""
+
+                                            try {
+                                                val respuesta =
+                                                    RetrofitClient.api.enviarPedidoACocina(
+                                                        pedidoId = pedido.pedidoId,
+                                                        token = "Bearer $token"
+                                                    )
+                                                if (respuesta.isSuccessful){
+                                                    mensajeExito =
+                                                        respuesta.body()?.mensaje
+                                                            ?: "Pedido enviado a cocina correctamente"
+                                                    //Actualizar los pedidos
+                                                    //para mostrar el nuevo estado
+                                                    actualizacion++
+
+                                               } else{
+                                                   mensajeError =
+                                                       when (respuesta.code()){
+                                                           400 -> "El pedido no tiene productos váñidos"
+                                                           401 -> "Tu sesión ha expirado"
+                                                           403 -> "No tienes permiso para enviar pedidos"
+                                                           404 -> "No se encontró el pedido"
+                                                           409 -> "El pedido ya fue enviado o no permite envíos"
+                                                           else -> "Error al enviar pedido (${respuesta.code()})"
+                                                       }
+                                               }
+
+                                            } catch (error: IOException){
+                                                mensajeError=
+                                                    "No se pudo conectar con el servidor"
+                                            } catch (error: CancellationException){
+                                                throw error
+                                            } catch (error: Exception){
+                                                mensajeError =
+                                                    "Ocurrió un error al enviar el pedido"
+                                            } finally {
+                                                pedidoEnviandoId=null
+                                            }
+                                    }
+
+                                    },
+                                    enabled = pedidoEnviandoId == null,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF388E3C)
+                                    )
+                                ){
+                                    Text(
+                                        if (pedidoEnviandoId == pedido.pedidoId)
+                                            "Enviando..."
+
+                                        else
+                                            "Enviar a cocina"
+                                    )
+                                }
+                            } else if (pedido.estado == "ENVIADO"){
+                                Spacer(
+                                    modifier = Modifier.height(8.dp)
+                                )
+
+                                Text(
+                                    text = "Enviado a cocina",
+                                    color = Color(0xFF2E7D32),
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }

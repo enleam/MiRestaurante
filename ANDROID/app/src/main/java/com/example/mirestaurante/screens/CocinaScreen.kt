@@ -1,7 +1,6 @@
 package com.example.mirestaurante.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +18,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mirestaurante.R
+import com.example.mirestaurante.network.PedidoCocina
+import com.example.mirestaurante.network.ActualizarEstadoPedidoRequest
+import com.example.mirestaurante.network.RetrofitClient
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import java.io.IOException
+import java.util.Locale
 
 //Colores del prototipo
 private val Naranja = Color(0xFFDB7C43)
@@ -27,46 +33,8 @@ private val Azul = Color(0xFF5D83A7)
 private val GrisTexto = Color(0xFF777777)
 private val GrisBorde = Color(0xFFE3E3E3)
 
-//Modelo sencillo de pedido para el prototipo
-private data class PedidoEjemplo(
-    val numero: String,
-    val mesa: String,
-    val productos: List<String>,
-    val estado: String
-)
-
-//Datos de ejemplo para mostrar la interfaz
-private fun obtenerPedidosEjemplo(): List<PedidoEjemplo> {
-    return listOf(
-        PedidoEjemplo(
-            "005",
-            "Mesa 04",
-            listOf("2 × Lomo saltado", "1 × Ají de gallina"),
-            "Pendiente"
-        ),
-        PedidoEjemplo(
-            "006",
-            "Mesa 07",
-            listOf("1 × Arroz con pollo", "2 × Chicha morada"),
-            "Pendiente"
-        ),
-        PedidoEjemplo(
-            "007",
-            "Mesa 04",
-            listOf("1 × Lomo saltado", "1 × Gaseosa"),
-            "En preparación"
-        ),
-        PedidoEjemplo(
-            "008",
-            "Mesa 07",
-            listOf("2 × Ají de gallina"),
-            "Listo"
-        )
-    )
-}
-
 @Composable
-fun PantallaCocina(onCerrarSesion: () -> Unit) {
+fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
 
     var filtro by rememberSaveable {
         mutableStateOf("Todos")
@@ -76,30 +44,87 @@ fun PantallaCocina(onCerrarSesion: () -> Unit) {
         mutableStateOf(false)
     }
 
-    //Los cambios son unicamente locales por ahora
+    //HU09: Pedidos obtenidos desde el backend
     var pedidos by remember {
-        mutableStateOf(obtenerPedidosEjemplo())
+        mutableStateOf<List<PedidoCocina>>(emptyList())
     }
 
-    //Cantidades segun el estado
-    val pendientes = pedidos.count {
-        it.estado == "Pendiente"
+    //Estado de carga
+    var cargando by remember {
+        mutableStateOf((true))
     }
 
-    val enPreparacion = pedidos.count {
-        it.estado == "En preparación"
+    //Mensaje de error y confirmacion
+    var mensajeError by remember {
+        mutableStateOf("")
     }
 
-    val listos = pedidos.count {
-        it.estado == "Listo"
+    var mensajeExito by remember {
+        mutableStateOf("")
+    }
+
+    //Identificar el pedido que se esta actualizando
+    var pedidoActualizandoId by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    //Permite actualizar la lista
+    var actualizacion by remember {
+        mutableStateOf(0)
+    }
+
+    val scope = rememberCoroutineScope()
+    //HU09: Consultar pedidos desde SQL Server
+    LaunchedEffect(token, actualizacion) {
+        cargando = true
+        mensajeError = ""
+
+        try {
+            val respuesta = RetrofitClient.api.listarPedidosCocina(
+                token = "Bearer $token"
+            )
+            if (respuesta.isSuccessful){
+                val datos = respuesta.body()
+                if (datos != null){
+                    pedidos = datos.pedidos
+                } else {
+                    mensajeError = "No se recibieron datos del servidor"
+                }
+                } else {
+                    mensajeError = when (respuesta.code()){
+                        401 -> "Tu sesión ha expirado"
+                        403 -> "No tienes permiso para consultar pedidos de cocina"
+                        else -> "Error al consultar pedidos (${respuesta.code()})"
+                    }
+                }
+            }catch (error: IOException){
+                mensajeError = "No se pudo conectar con el servidor"
+            } catch (error: CancellationException){
+                throw error
+            }catch (error: Exception){
+                mensajeError = "Ocurrió un error al cargar los pedidos"
+            }finally {
+                cargando = false
+            }
+    }
+    //HU09: Contadores segun el estado real de los pedidos
+
+    val pendientes = pedidos.count{
+        it.estado == "ENVIADO"
+    }
+    val enPreparacion = pedidos.count{
+        it.estado == "EN_PREPARACION"
+    }
+    val listos = pedidos.count{
+        it.estado == "LISTO"
     }
 
     //Filtrar pedidos
     val pedidosFiltrados = pedidos.filter { pedido ->
         when (filtro) {
-            "Pendientes" -> pedido.estado == "Pendiente"
-            "En preparación" -> pedido.estado == "En preparación"
-            "Listos" -> pedido.estado == "Listo"
+            "Pendientes" -> pedido.estado == "ENVIADO"
+            "En preparación" -> pedido.estado == "EN_PREPARACION"
+            "Listos" -> pedido.estado == "LISTO"
             else -> true
         }
     }
@@ -269,17 +294,52 @@ fun PantallaCocina(onCerrarSesion: () -> Unit) {
                     color = Color.Black
                 )
 
-                //Icono referencial de actualización
-                //Se conectará con la API en el Sprint 4
-                Icon(
-                    painter = painterResource(R.drawable.ic_refresh),
-                    contentDescription = null,
-                    tint = Naranja,
-                    modifier = Modifier.size(22.dp)
+                //hu09: Actualizar pedidos desde el backend
+                IconButton(
+                    onClick = {
+                        mensajeExito=""
+                        actualizacion++
+                    },
+                    enabled = !cargando && pedidoActualizandoId == null
+                ) {
+                        //Icono referencial de actualización
+                        //Se conectará con la API en el Sprint 4
+
+                        Icon(
+                        painter = painterResource(R.drawable.ic_refresh),
+                        contentDescription = "Actualizar pedidos",
+                        tint = Naranja
+                    )
+                }
+            }
+            //Mensaje de confirmación
+            if (mensajeExito.isNotBlank()){
+                Text(
+                    text = mensajeExito,
+                    color = Color(0xFF2E7D32),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            // Indicador de carga
+            if (cargando) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Naranja
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            //Mensaje de error
+            if (mensajeError.isNotBlank()){
+                Text(
+                    text = mensajeError,
+                    color = Color.Red,
+                    fontSize = 13.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             //Lista de pedidos
             LazyColumn(
@@ -290,32 +350,80 @@ fun PantallaCocina(onCerrarSesion: () -> Unit) {
 
                 items(
                     pedidosFiltrados,
-                    key = { it.numero }
+                    key = { it.pedidoId }
                 ) { pedido ->
 
                     TarjetaPedidoCocina(
                         pedido = pedido,
-                        onCambiarEstado = {
+                        actualizando = pedidoActualizandoId == pedido.pedidoId,
+                        habilitado = pedidoActualizandoId == null,
+                        onCambiarEstado = { nuevoEstado ->
 
-                            //Simulacion local de cambio de estado
-                            pedidos = pedidos.map { actual ->
+                                scope.launch {
+                                    pedidoActualizandoId = pedido.pedidoId
+                                    mensajeError = ""
+                                    mensajeExito = ""
 
-                                if (actual.numero == pedido.numero) {
+                                    try {
+                                        val respuesta =
+                                            RetrofitClient.api.actualizarEstadoPedidoCocina(
+                                                pedidoId = pedido.pedidoId,
+                                                token = "Bearer $token",
+                                                datos = ActualizarEstadoPedidoRequest(
+                                                    nuevoEstado = nuevoEstado
+                                                )
+                                            )
+                                        if(respuesta.isSuccessful){
+                                            mensajeExito =
+                                                respuesta.body()?.mensaje
+                                                    ?: "Estado del pedido actualizado correctamente"
+                                            //Volver a consultar los pedidos
+                                            actualizacion++
+                                        }else{
 
-                                    val nuevoEstado = when (actual.estado) {
-                                        "Pendiente" -> "En preparación"
-                                        "En preparación" -> "Listo"
-                                        else -> actual.estado
+                                            mensajeError = when (respuesta.code()){
+                                                400 -> "Los datos enviados no son válidos"
+                                                401 -> "Tu sesión ha expirado"
+                                                403 -> "No tienes permiso para actualizar pedidos"
+                                                404 -> "No se encontró el pedido"
+                                                409 -> "El pedido ya cambió de estado o no permite esta operación"
+                                                else -> "Error al actualizar pedido (${respuesta.code()})"
+                                            }
+                                        }
+                                    }catch (error: IOException){
+                                        mensajeError =
+                                            "No se pudo conectar con el servidor"
+                                    }catch (error: CancellationException){
+                                        throw error
+                                    }catch (error: Exception){
+                                        mensajeError =
+                                            "Ocurrió un error al actualizar el pedido"
+                                    }finally {
+                                        pedidoActualizandoId = null
                                     }
-
-                                    actual.copy(estado = nuevoEstado)
-
-                                } else {
-                                    actual
                                 }
                             }
-                        }
                     )
+                }
+                //Mensaje cuando no existen pedidos
+                if(!cargando &&
+                    mensajeError.isBlank() &&
+                    pedidosFiltrados.isEmpty()
+                    ){
+
+                    item {
+                        Text(
+                            text = if (pedidos.isEmpty()){
+                                "Todavía no hay pedidos recibidos."
+                            } else {
+                                "No hay pedidos  en esta categoría."
+                            },
+                            color = GrisTexto,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+
                 }
             }
         }
@@ -361,14 +469,24 @@ private fun ResumenPedido(
 //Tarjeta de un pedido
 @Composable
 private fun TarjetaPedidoCocina(
-    pedido: PedidoEjemplo,
-    onCambiarEstado: () -> Unit
+    pedido: PedidoCocina,
+    actualizando: Boolean,
+    habilitado: Boolean,
+    onCambiarEstado: (String) -> Unit
 ) {
 
     val colorEstado = when (pedido.estado) {
-        "Pendiente" -> Amarillo
-        "En preparación" -> Naranja
-        else -> Azul
+        "ENVIADO" -> Amarillo
+        "EN_PREPARACION" -> Naranja
+        "LISTO" -> Azul
+        else -> GrisTexto
+    }
+
+    val nombreEstado = when (pedido.estado){
+        "ENVIADO" -> "Pendiente"
+        "EN_PREPARACION" -> "En preparación"
+        "LISTO" -> "Listo"
+        else -> pedido.estado
     }
 
     Surface(
@@ -390,14 +508,14 @@ private fun TarjetaPedidoCocina(
             ) {
 
                 Text(
-                    text = "Pedido #${pedido.numero}",
+                    text = "Pedido #${pedido.pedidoId}",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black
                 )
 
                 Text(
-                    text = pedido.estado,
+                    text = nombreEstado,
                     fontSize = 12.sp,
                     color = colorEstado,
                     fontWeight = FontWeight.Medium
@@ -407,7 +525,7 @@ private fun TarjetaPedidoCocina(
             Spacer(modifier = Modifier.height(5.dp))
 
             Text(
-                text = pedido.mesa,
+                text = "Mesa ${pedido.mesaNumero}",
                 fontSize = 13.sp,
                 color = GrisTexto
             )
@@ -421,13 +539,25 @@ private fun TarjetaPedidoCocina(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            //Productos del pedido
+            //Productos reales del pedido
             pedido.productos.forEach { producto ->
 
                 Text(
-                    text = producto,
+                    text = "${producto.cantidad} × ${producto.nombre}",
                     fontSize = 14.sp,
                     color = Color.DarkGray
+                )
+
+                Text(
+                    text = "Subtotal: S/ ${
+                        String.format(
+                            Locale.US,
+                            "%.2f",
+                            producto.subtotal
+                        )
+                    }",
+                    fontSize = 12.sp,
+                    color = GrisTexto
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -435,12 +565,34 @@ private fun TarjetaPedidoCocina(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            HorizontalDivider(
+                color = GrisBorde,
+                thickness = 1.dp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            //Total del pedido
+            Text(
+                text = "Total: S/ ${
+                    String.format(
+                        Locale.US,
+                        "%.2f",
+                        pedido.total
+                    )
+                }",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             //Acciones segun el estado
             when (pedido.estado) {
 
-                "Pendiente" -> {
+                "ENVIADO" -> {
                     Button(
-                        onClick = onCambiarEstado,
+                        onClick = {
+                            onCambiarEstado("EN_PREPARACION")
+                        },
+                        enabled = habilitado,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp),
@@ -450,7 +602,10 @@ private fun TarjetaPedidoCocina(
                         )
                     ) {
                         Text(
-                            text = "Iniciar preparación",
+                            text = if (actualizando)
+                                "Actualizando..."
+                            else
+                                "Iniciar preparación",
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -458,9 +613,10 @@ private fun TarjetaPedidoCocina(
                     }
                 }
 
-                "En preparación" -> {
+                "EN_PREPARACION" -> {
                     OutlinedButton(
-                        onClick = onCambiarEstado,
+                        onClick = {onCambiarEstado("LISTO")},
+                        enabled = habilitado,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp),
@@ -471,14 +627,17 @@ private fun TarjetaPedidoCocina(
                         )
                     ) {
                         Text(
-                            text = "Marcar como listo",
+                            text = if (actualizando)
+                                "Actualizando..."
+                            else
+                                "Marcar como listo",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
-                "Listo" -> {
+                "LISTO" -> {
                     Text(
                         text = "✓ Listo para recoger",
                         fontSize = 13.sp,

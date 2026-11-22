@@ -70,6 +70,8 @@ class MainActivity : ComponentActivity() {
 
                     "COCINA" -> {
                         PantallaCocina(
+                            //Enviar el token de autenticacion
+                            token = sesion?.token.orEmpty(),
                             onCerrarSesion = {
                                 sesion = null
                             }

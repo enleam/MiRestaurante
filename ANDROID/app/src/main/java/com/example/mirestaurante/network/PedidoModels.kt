@@ -71,3 +71,56 @@ data class ModificarPedidoResponse(
     val mensaje: String,
     val pedido: PedidoModificado
 )
+
+//HU09: Informar del pedido enviado a cocina
+
+data class PedidoEnviado(
+    val pedidoId: Int,
+    val atencionId: Int,
+    val estado: String,
+    val fechaRegistro: String
+)
+
+//HU09: Respuesta del backend al enviar un pedido
+
+data class EnviarPedidoResponse(
+    val mensaje: String,
+    val pedido: PedidoEnviado
+)
+
+//HU09: Pedido consultado desde la pantalla de cocina
+
+data class PedidoCocina(
+    val pedidoId: Int,
+    val atencionId: Int,
+    val estado: String,
+    val mesaNumero: Int,
+    val fechaRegistro: String,
+    val productos: List<DetallePedidoResponse>,
+    val total: Double
+)
+//Respuesta de consulta de pedidos de cocina
+data class ConsultarPedidosCocinaResponse(
+    val mensaje: String,
+    val pedidos: List<PedidoCocina>
+)
+
+//Solicitud para actualizar el estado del pedido
+data class ActualizarEstadoPedidoRequest(
+    val nuevoEstado: String,
+)
+
+//Información del pedido actualizado por cocina
+data class PedidoEstadoCocina(
+    val pedidoId: Int,
+    val atencionId: Int,
+    val estado: String,
+    val fechaRegistro: String,
+    val mesaNumero: Int
+)
+//Respuesta de actualizacion del estado
+
+data class ActualizarEstadoPedidoResponse(
+    val mensaje: String,
+    val pedido: PedidoEstadoCocina
+)
