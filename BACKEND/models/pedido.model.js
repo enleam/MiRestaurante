@@ -659,9 +659,267 @@ async function enviarPedidoACocina(pedidoId, mozoId) {
         throw error;
     }
 }
+
+/*HU09: Listar pedidos enviados a cocina*/
+async function listarPedidosCocina(cocinaId){
+    if(!Number.isSafeInteger(cocinaId) || cocinaId <= 0){
+        const error = new Error("El ID de cocina es invalido");
+        error.status = 400;
+        throw error;
+    }
+
+    //Verificar que el usuario sea de cocina y este activo
+    const usuario = await new sql.Request()
+        .input("cocinaId",sql.Int, cocinaId)
+        .query(`
+            SELECT u.usuario_id
+            FROM seguridad.Usuario u
+            INNER JOIN seguridad.Rol r
+                ON r.rol_id = u.rol_id
+            WHERE u.usuario_id = @cocinaId
+                AND u.estado = N'ACTIVO'
+                AND r.nombre = N'COCINA'
+        `);
+    if(usuario.recordset.length === 0){
+        const error = new Error("Usuario de cocina no autorizado");
+        error.status = 403;
+        throw error;
+    }
+    //Consultar pedidos de las atenciones abiertas
+    const resultado = await new sql.Request()
+        .query(`
+            SELECT
+                p.pedido_id AS pedidoId,
+                p.atencion_id AS atencionId,
+                m.numero AS mesaNumero,
+                p.estado,
+                p.fecha_registro AS fechaRegistro,
+                d.detalle_id AS detalleId,
+                d.producto_id AS productoId,
+                pr.nombre,
+                d.cantidad,
+                d.precio_unitario AS precioUnitario
+            FROM pedidos.Pedido p
+            INNER JOIN salon.AtencionMesa a
+                ON a.atencion_id = p.atencion_id
+            INNER JOIN salon.Mesa m
+                ON m.mesa_id = a.mesa_id
+            LEFT JOIN pedidos.DetallePedido d
+                ON d.pedido_id = p.pedido_id
+            LEFT JOIN catalogo.Producto pr
+                ON pr.producto_id = d.producto_id
+            WHERE a.estado = N'ABIERTA'
+                AND p.estado IN (
+                    N'ENVIADO',
+                    N'EN_PREPARACION',
+                    N'LISTO'
+                )
+            ORDER BY 
+                CASE p.estado
+                    WHEN N'ENVIADO' THEN 1
+                    WHEN N'EN_PREPARACION' THEN 2
+                    WHEN N'LISTO' THEN 3
+                END,
+                p.fecha_registro ASC,
+                p.pedido_id,
+                d.detalle_id
+        `);
+    //Agrupar los productos por pedido
+    const pedidosMap = new Map();
+    
+    for(const fila of resultado.recordset){
+        if(!pedidosMap.has(fila.pedidoId)){
+            pedidosMap.set(fila.pedidoId,{
+                pedidoId: fila.pedidoId,
+                atencionId: fila.atencionId,
+                mesaNumero: fila.mesaNumero,
+                estado: fila.estado,
+                fechaRegistro: fila.fechaRegistro,
+                productos: [],
+                total: 0
+            });
+        }
+
+        const pedido = pedidosMap.get(fila.pedidoId);
+        if(fila.detalleId !== null){
+            const precio = Number(fila.precioUnitario);
+
+            const subtotalCentavos =
+                Math.round(precio * 100)*fila.cantidad;
+            pedido.productos.push({
+                detalleId: fila.detalleId,
+                productoId: fila.productoId,
+                nombre: fila.nombre,
+                cantidad: fila.cantidad,
+                precioUnitario: precio,
+                subtotal: subtotalCentavos/100
+            });
+
+            pedido.total = Math.round(
+                pedido.total * 100 + subtotalCentavos
+            ) / 100
+        }
+    }
+
+    return Array.from(pedidosMap.values());
+
+}
+
+/*HU09: Actualizar estado del pedido desde cocina */
+async function actualizarEstadoPedidoCocina(
+    pedidoId,
+    cocinaId,
+    nuevoEstado
+) {
+
+    if(
+        !Number.isSafeInteger(pedidoId) || pedidoId <= 0 ||
+        !Number.isSafeInteger(cocinaId) || cocinaId <= 0
+    ){
+        const error = new Error("Identificadores invalidos");
+        error.status = 400;
+        throw error;
+    }
+
+    if(
+        nuevoEstado !== "EN_PREPARACION" &&
+        nuevoEstado !== "LISTO"
+    ){
+        const error = new Error("El estado solicitado no es valido");
+        error.status = 400;
+        throw error;
+    }
+
+    const transaccion = new sql.Transaction();
+    let transaccionActiva = false;
+
+    try{
+        await transaccion.begin();
+        transaccionActiva = true;
+
+        //Verificar usuario de cocina
+        const usuario = await new sql.Request(transaccion)
+            .input("cocinaId",sql.Int, cocinaId)
+            .query(`
+                SELECT u.usuario_id
+                FROM seguridad.Usuario u 
+                INNER JOIN seguridad.Rol r
+                    ON r.rol_id = u.rol_id
+                WHERE u.usuario_id = @cocinaId
+                    AND u.estado = N'ACTIVO'
+                    AND r.nombre = N'COCINA'
+            `);
+        if (usuario.recordset.length === 0){
+            const error = new Error(
+                "Usuario de cocina no autorizado"
+            );
+            error.status = 403;
+            throw error;
+        }
+
+        //Consultar pedido y bloquearlo durante la transaccion
+        const consultaPedido = await new sql.Request(transaccion)
+            .input("pedidoId",sql.Int, pedidoId)
+            .query(`
+                SELECT 
+                    p.pedido_id AS pedidoId,
+                    p.atencion_id AS atencionId,
+                    p.estado,
+                    p.fecha_registro AS fechaRegistro,
+                    a.estado AS estadoAtencion,
+                    m.numero AS mesaNumero
+                FROM pedidos.Pedido p WITH(UPDLOCK, HOLDLOCK)
+                INNER JOIN salon.AtencionMesa a WITH (UPDLOCK, HOLDLOCK)
+                    ON a.atencion_id = p.atencion_id
+                INNER JOIN salon.Mesa m
+                    ON m.mesa_id = a.mesa_id
+                WHERE p.pedido_id = @pedidoId
+            `);
+
+        if(consultaPedido.recordset.length === 0){
+            const error = new Error ("El pedido no existe");
+            error.status = 404;
+            throw error;
+        }
+        const pedido = consultaPedido.recordset[0];
+        //Verificar que la atencion siga abierta
+        if (pedido.estadoAtencion !== "ABIERTA"){
+            const error = new Error(
+                "La atencion ya no esta abierta"
+            );
+            error.status = 409;
+            throw error;
+        }
+        //Validar las transiciones de estado
+        if(
+            nuevoEstado == "EN_PREPARACION" &&
+            pedido.estado !== "ENVIADO"
+        ){
+            const error = new Error(
+                "Solo se pueden preparar pedidos enviados"
+            );
+            error.status = 409;
+            throw error;
+        }
+        if(
+            nuevoEstado == "LISTO" &&
+            pedido.estado !== "EN_PREPARACION"
+        ){
+            const error = new Error(
+                "El pedido debe estar en preparacion para marcarlo como listo"
+            );
+            error.status = 409;
+            throw error;
+        }
+        //Actualizar estado
+        const resultado = await new sql.Request(transaccion)
+            .input("pedidoId", sql.Int, pedidoId)
+            .input("estadoActual", sql.NVarChar(20), pedido.estado)
+            .input("nuevoEstado", sql.NVarChar(20), nuevoEstado)
+            .query(`
+                UPDATE pedidos.Pedido
+                SET estado = @nuevoEstado
+                OUTPUT
+                    INSERTED.pedido_id AS pedidoId,
+                    INSERTED.atencion_id AS atencionId,
+                    INSERTED.estado,
+                    INSERTED.fecha_registro AS fechaRegistro
+                WHERE pedido_id = @pedidoId
+                    AND estado = @estadoActual
+                `);
+            if(resultado.recordset.length === 0){
+                const error = new Error (
+                    "No se pudo actualizar el estado del pedido"
+                );
+                error.status = 409;
+                throw error;
+            }
+            await transaccion.commit();
+            transaccionActiva = false;
+
+            return {
+                ...resultado.recordset[0],
+                mesaNumero: pedido.mesaNumero
+            };
+    } catch (error){
+        if (transaccionActiva){
+            try{
+                await transaccion.rollback();
+            } catch(rollbackError){
+                console.error(
+                    "Error al revertir actualizacion de cocina:",
+                    rollbackError
+                );
+            }
+        }
+        throw error;
+    }
+}
 module.exports = {
     registrarPedido,
     modificarPedido,
     listarPedidosPorAtencion,
-    enviarPedidoACocina
+    enviarPedidoACocina,
+    listarPedidosCocina,
+    actualizarEstadoPedidoCocina
 };

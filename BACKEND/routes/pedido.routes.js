@@ -6,6 +6,13 @@ const { permitirRoles } = require("../middlewares/role.middleware");
 
 const router = express.Router();
 
+router.get(
+    "/cocina",
+    verificarToken,
+    permitirRoles("COCINA"),
+    pedidoController.listarPedidosCocina
+);
+
 router.post(
     "/",
     verificarToken,
@@ -26,6 +33,13 @@ router.patch(
     verificarToken,
     permitirRoles("MOZO"),
     pedidoController.enviarPedidoACocina
+);
+
+router.patch(
+    "/:pedidoId/estado",
+    verificarToken,
+    permitirRoles("COCINA"),
+    pedidoController.actualizarEstadoPedidoCocina
 );
 
 router.put(
