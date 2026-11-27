@@ -44,7 +44,7 @@ fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
         mutableStateOf(false)
     }
 
-    //HU09: Pedidos obtenidos desde el backend
+    //HU10: Pedidos obtenidos desde el backend
     var pedidos by remember {
         mutableStateOf<List<PedidoCocina>>(emptyList())
     }
@@ -74,7 +74,7 @@ fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
     }
 
     val scope = rememberCoroutineScope()
-    //HU09: Consultar pedidos desde SQL Server
+    //HU10: Consultar pedidos mediante la API REST
     LaunchedEffect(token, actualizacion) {
         cargando = true
         mensajeError = ""
@@ -107,7 +107,7 @@ fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
                 cargando = false
             }
     }
-    //HU09: Contadores segun el estado real de los pedidos
+    //HU10: Contadores segun el estado real de los pedidos
 
     val pendientes = pedidos.count{
         it.estado == "ENVIADO"
@@ -294,7 +294,7 @@ fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
                     color = Color.Black
                 )
 
-                //hu09: Actualizar pedidos desde el backend
+                //HU10: Actualizar pedidos desde el backend
                 IconButton(
                     onClick = {
                         mensajeExito=""
@@ -302,9 +302,6 @@ fun PantallaCocina(token: String, onCerrarSesion: () -> Unit) {
                     },
                     enabled = !cargando && pedidoActualizandoId == null
                 ) {
-                        //Icono referencial de actualización
-                        //Se conectará con la API en el Sprint 4
-
                         Icon(
                         painter = painterResource(R.drawable.ic_refresh),
                         contentDescription = "Actualizar pedidos",
