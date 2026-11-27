@@ -172,7 +172,8 @@ async function enviarPedidoACocina(req, res) {
     });
  }
 }
-/*HU09: Consultar pedidos desde cocina*/
+
+/*HU10: Consultar pedidos desde cocina*/
 async function listarPedidosCocina(req, res) {
     try{
 
