@@ -89,7 +89,7 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<EnviarPedidoResponse>
 
-    //Consultar pedidos enviados a cocina
+    //HU10: Consultar pedidos enviados a cocina
     @GET("api/pedidos/cocina")
     suspend fun listarPedidosCocina(
         @Header("Authorization") token: String
