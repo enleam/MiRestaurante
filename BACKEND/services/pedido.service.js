@@ -1,6 +1,4 @@
-
 const pedidoModel = require("../models/pedido.model");
-
 
 function crearError(mensaje, estado) {
     const error = new Error(mensaje);
@@ -8,10 +6,7 @@ function crearError(mensaje, estado) {
     return error;
 }
 
-
 async function registrarPedido(atencionId, mozoId, productos) {
-
-
     if (!Number.isInteger(atencionId) || atencionId <= 0) {
         throw crearError("La atencion es invalida", 400);
     }
@@ -19,7 +14,6 @@ async function registrarPedido(atencionId, mozoId, productos) {
     if (!Number.isInteger(mozoId) || mozoId <= 0) {
         throw crearError("El mozo es invalido", 400);
     }
-
 
     if (!Array.isArray(productos) || productos.length === 0) {
         throw crearError(
@@ -30,9 +24,7 @@ async function registrarPedido(atencionId, mozoId, productos) {
 
     const productosRegistrados = new Set();
 
-
     for (const producto of productos) {
-
         if (!producto ||
             !Number.isInteger(producto.productoId) ||
             producto.productoId <= 0) {
@@ -57,7 +49,6 @@ async function registrarPedido(atencionId, mozoId, productos) {
         productosRegistrados.add(producto.productoId);
     }
 
-   
     let pedido;
 
     try {
@@ -67,14 +58,12 @@ async function registrarPedido(atencionId, mozoId, productos) {
             productos
         );
     } catch (error) {
-
         if (/^El producto \d+ no existe o no esta disponible$/.test(error.message)) {
             throw crearError(error.message, 400);
         }
 
         throw error;
     }
-
 
     if (!pedido) {
         throw crearError(
@@ -86,10 +75,7 @@ async function registrarPedido(atencionId, mozoId, productos) {
     return pedido;
 }
 
-
 async function modificarPedido(pedidoId, mozoId, productos) {
-
-
     const idPedido = Number(pedidoId);
     const idMozo = Number(mozoId);
 
@@ -111,7 +97,6 @@ async function modificarPedido(pedidoId, mozoId, productos) {
     const productosRegistrados = new Set();
 
     for (const producto of productos) {
-
         if (!producto ||
             !Number.isInteger(producto.productoId) ||
             producto.productoId <= 0) {
@@ -125,6 +110,7 @@ async function modificarPedido(pedidoId, mozoId, productos) {
                 400
             );
         }
+
         if (productosRegistrados.has(producto.productoId)) {
             throw crearError(
                 "No se puede repetir un producto en el pedido",
@@ -148,11 +134,11 @@ async function listarPedidosPorAtencion(atencionId, mozoId) {
     const idAtencion = Number(atencionId);
     const idMozo = Number(mozoId);
 
-    if(!Number.isSafeInteger(idAtencion)|| idAtencion <= 0){
+    if (!Number.isSafeInteger(idAtencion) || idAtencion <= 0) {
         throw crearError("El ID de la atencion es invalido", 400);
     }
 
-    if(!Number.isSafeInteger(idMozo)|| idMozo <= 0){
+    if (!Number.isSafeInteger(idMozo) || idMozo <= 0) {
         throw crearError("El ID del mozo es invalido", 400);
     }
 
@@ -162,23 +148,23 @@ async function listarPedidosPorAtencion(atencionId, mozoId) {
     );
 
     return pedidos;
-    
 }
-/*HU09: Enviar un pedido a cocina*/
+
+/* HU09: Enviar un pedido a cocina */
 async function enviarPedidoACocina(pedidoId, mozoId) {
 
     //Convertir y validar los identificadores
     const idPedido = Number(pedidoId);
     const idMozo = Number(mozoId);
 
-    if (!Number.isSafeInteger(idPedido) || idPedido <=0 ){
+    if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
         throw crearError("El ID del pedido es invalido", 400);
     }
 
-    if(!Number.isSafeInteger(idMozo) || idMozo <=0){
+    if (!Number.isSafeInteger(idMozo) || idMozo <= 0) {
         throw crearError("El ID del mozo es invalido", 400);
     }
-    
+
     //Enviar el pedido mediante el modelo
     const pedido = await pedidoModel.enviarPedidoACocina(
         idPedido,
@@ -188,59 +174,41 @@ async function enviarPedidoACocina(pedidoId, mozoId) {
     return pedido;
 }
 
-//HU09:Enviar pedido a cocina (desde el mozo)
-async function enviarPedidoACocina(pedidoId, mozoId) {
-
-    const idPedido = Number(pedidoId);
-    const idMozo = Number(mozoId);
-
-    if(!Number.isSafeInteger(idPedido) || idPedido <= 0){
-        throw crearError("El ID del pedido es invalido", 400);
-    }
-
-    if(!Number.isSafeInteger(idMozo) || idMozo <= 0){
-        throw crearError("El ID del mozo es invalido",400);
-    }
-
-    return await pedidoModel.enviarPedidoACocina(
-        idPedido,
-        idMozo
-    );
-    
-}
-
-//HU09: Consultar pedidos desde cocina
+//HU10: Consultar pedidos desde cocina
+/*Modificacion: Se identifica la funcion como parte de la HU10.
+  La logica implementada durante el Sprint 3 se conserva. */
 async function listarPedidosCocina(cocinaId) {
     const idCocina = Number(cocinaId);
-    if(!Number.isSafeInteger(idCocina) || idCocina <=0){
+
+    if (!Number.isSafeInteger(idCocina) || idCocina <= 0) {
         throw crearError("El ID de cocina es invalido", 400);
     }
 
     return await pedidoModel.listarPedidosCocina(idCocina);
 }
 
-//HU09: Actualizar estado del pedido desde cocina
-
+/* HU09: Actualizar estado del pedido desde cocina */
 async function actualizarEstadoPedidoCocina(
     pedidoId,
     cocinaId,
     nuevoEstado
 ) {
-
     const idPedido = Number(pedidoId);
     const idCocina = Number(cocinaId);
-    
-    if(!Number.isSafeInteger(idPedido) || idPedido <=0){
+
+    if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
         throw crearError("El ID del pedido es invalido", 400);
     }
-    if(!Number.isSafeInteger(idCocina) || idCocina <=0){
+
+    if (!Number.isSafeInteger(idCocina) || idCocina <= 0) {
         throw crearError(" El ID de cocina es invalido", 400);
     }
-    if(
+
+    if (
         nuevoEstado !== "EN_PREPARACION" &&
         nuevoEstado !== "LISTO"
-    ){
-        throw crearError("El estado solicitado no es valido",400);
+    ) {
+        throw crearError("El estado solicitado no es valido", 400);
     }
 
     return await pedidoModel.actualizarEstadoPedidoCocina(
@@ -249,6 +217,7 @@ async function actualizarEstadoPedidoCocina(
         nuevoEstado
     );
 }
+
 module.exports = {
     registrarPedido,
     modificarPedido,
