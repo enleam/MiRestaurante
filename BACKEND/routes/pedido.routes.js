@@ -6,6 +6,7 @@ const { permitirRoles } = require("../middlewares/role.middleware");
 
 const router = express.Router();
 
+//HU10: Consultar pedidos desde cocina
 router.get(
     "/cocina",
     verificarToken,
