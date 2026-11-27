@@ -88,7 +88,7 @@ data class EnviarPedidoResponse(
     val pedido: PedidoEnviado
 )
 
-//HU09: Pedido consultado desde la pantalla de cocina
+//HU10: Pedido consultado desde la pantalla de cocina
 
 data class PedidoCocina(
     val pedidoId: Int,
